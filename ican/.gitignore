@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Env & secrets
+.env
+backend/.env
+
+# Runtime data
+backend/data/
+
+# Node
+node_modules/
+frontend/dist/
+*.local
+
+# IDE
+.idea/
+.vscode/

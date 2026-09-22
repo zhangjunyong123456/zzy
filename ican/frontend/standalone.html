@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UniGrow Agent · 智学成长Agent</title>
+<style>
+/* ==========================================================
+   UniGrow Agent · 单文件演示版
+   起始页(Landing) → 对话(Chat 多Agent流式) → 知识库(Docs)
+   无任何外部依赖，双击即可运行
+   ========================================================== */
+:root {
+  --agent-study: #e8896b;
+  --agent-research: #93ab84;
+  --agent-competition: #dfa453;
+  --agent-career: #86ad72;
+  --agent-campus: #7fb39c;
+  --agent-main: #d9694a;
+  --bg-page: #fafafa;
+  --bg-card: #ffffff;
+  --border: #e9ebee;
+  --text-main: #1d2129;
+  --text-sub: #878e99;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  color: var(--text-main);
+  background: var(--bg-page);
+}
+button { font-family: inherit; cursor: pointer; }
+.hidden { display: none !important; }
+
+/* ================= 起始页 ================= */
+.landing { position: relative; overflow-x: hidden; }
+.bg-field { position: fixed; inset: 0; z-index: 0; }
+.grain {
+  position: fixed; inset: -50%; z-index: 2; pointer-events: none; opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* CSS 色块流体（替代 three.js 演示） */
+.blob-field { position: fixed; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(2px) saturate(1.05);
+  box-shadow: inset -30px -40px 70px rgba(120, 80, 50, 0.22), 0 40px 90px rgba(160, 110, 80, 0.28);
+  will-change: transform, border-radius;
+}
+.blob-1 {
+  width: 46vmin; height: 46vmin; left: 8vw; top: 30vh;
+  background: radial-gradient(circle at 32% 28%, #ffcba8, #ff9e7a 68%, #f08a63);
+  animation: drift1 16s ease-in-out infinite alternate;
+}
+.blob-2 {
+  width: 34vmin; height: 34vmin; right: 10vw; top: 52vh;
+  background: radial-gradient(circle at 32% 28%, #c3d3ae, #93ab84 68%, #8ba274);
+  animation: drift2 19s ease-in-out infinite alternate;
+}
+.blob-3 {
+  width: 24vmin; height: 24vmin; right: 30vw; top: 10vh;
+  background: radial-gradient(circle at 32% 28%, #f2d3be, #e2a98f 68%, #d69a80);
+  animation: drift3 14s ease-in-out infinite alternate;
+}
+@keyframes drift1 {
+  0%   { transform: translate(0,0) scale(1);    border-radius: 52% 48% 55% 45% / 48% 52% 46% 54%; }
+  50%  { transform: translate(3vw,-6vh) scale(1.06); border-radius: 45% 55% 48% 52% / 55% 45% 55% 45%; }
+  100% { transform: translate(-2vw,4vh) scale(.97);  border-radius: 55% 45% 52% 48% / 46% 54% 48% 52%; }
+}
+@keyframes drift2 {
+  0%   { transform: translate(0,0) scale(1);    border-radius: 48% 52% 45% 55% / 55% 46% 54% 45%; }
+  50%  { transform: translate(-4vw,-5vh) scale(1.08); border-radius: 55% 45% 50% 50% / 45% 55% 46% 54%; }
+  100% { transform: translate(2vw,3vh) scale(.95);   border-radius: 46% 54% 55% 45% / 52% 48% 55% 45%; }
+}
+@keyframes drift3 {
+  0%   { transform: translate(0,0) scale(1);    border-radius: 50% 50% 47% 53% / 53% 47% 50% 50%; }
+  100% { transform: translate(-3vw,7vh) scale(1.1);  border-radius: 44% 56% 52% 48% / 56% 44% 52% 48%; }
+}
+
+.landing .nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 22px clamp(20px, 4vw, 56px);
+}
+.brand {
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-size: 24px; font-weight: 700; color: #3a2e24; text-decoration: none;
+  letter-spacing: -0.5px;
+}
+.brand-dot { color: #e8896b; }
+.nav-right { display: flex; align-items: center; gap: 26px; }
+.nav-link { color: #6b5d50; text-decoration: none; font-size: 14px; }
+.nav-link:hover { color: #3a2e24; }
+.nav-cta {
+  color: #3a2e24; text-decoration: none; font-size: 14px; font-weight: 600;
+  padding: 10px 20px; border-radius: 999px;
+  border: 1.5px solid rgba(58, 46, 36, 0.25);
+  transition: background 0.3s, color 0.3s, transform 0.3s;
+}
+.nav-cta:hover { background: #3a2e24; color: #fff6ea; transform: translateY(-1px); }
+
+.reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.16, 1, 0.3, 1); }
+.reveal.in { opacity: 1; transform: none; }
+.landing section { position: relative; z-index: 3; }
+
+.hero {
+  min-height: 100svh; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; text-align: center; padding: 0 24px;
+}
+.hero-kicker { font-size: 13px; letter-spacing: 0.5em; color: #b08a6e; margin: 0 0 18px; }
+.hero-title {
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-size: clamp(84px, 17vw, 230px); line-height: 0.95; letter-spacing: -0.03em;
+  color: #3a2e24; margin: 0; font-weight: 700;
+}
+.hero-title .dot { color: #e8896b; }
+.hero-sub {
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-size: clamp(19px, 2.6vw, 30px); color: #4a3c30; margin: 30px 0 8px;
+}
+.hero-line { font-size: 14px; color: #8a7a6a; margin: 0 0 36px; letter-spacing: 0.08em; }
+.hero-btn {
+  font-size: 16px; font-weight: 600; text-decoration: none;
+  color: #fff6ea; background: #3a2e24; padding: 16px 34px; border-radius: 999px;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), background 0.35s, box-shadow 0.35s;
+  box-shadow: 0 10px 30px rgba(58, 46, 36, 0.18);
+}
+.hero-btn:hover { transform: translateY(-3px); background: #e8896b; box-shadow: 0 16px 40px rgba(232, 137, 107, 0.35); }
+.scroll-cue { position: absolute; bottom: 34px; left: 50%; width: 1px; height: 52px; overflow: hidden; }
+.scroll-cue span {
+  display: block; width: 1px; height: 100%;
+  background: linear-gradient(#b08a6e, transparent);
+  animation: cue 2.2s ease-in-out infinite;
+}
+@keyframes cue { 0% { transform: translateY(-100%); } 60% { transform: translateY(0); } 100% { transform: translateY(100%); } }
+
+.scenes { padding: 16vh clamp(20px, 6vw, 90px); max-width: 1200px; margin: 0 auto; }
+.sec-head { margin-bottom: 7vh; }
+.sec-no { font-size: 12px; letter-spacing: 0.4em; color: #b08a6e; margin: 0 0 12px; }
+.sec-title {
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-size: clamp(34px, 5vw, 62px); color: #3a2e24; margin: 0; font-weight: 700;
+}
+.scene-row {
+  display: grid; grid-template-columns: 70px 1fr auto;
+  align-items: center; gap: clamp(16px, 3vw, 40px);
+  padding: 4.2vh 0; border-bottom: 1px solid rgba(58, 46, 36, 0.12);
+}
+.scene-row:last-child { border-bottom: none; }
+.scene-idx { font-family: Georgia, serif; font-style: italic; font-size: clamp(18px, 2vw, 26px); color: #e8896b; }
+.scene-txt h3 {
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-size: clamp(26px, 3.6vw, 46px); color: #3a2e24; margin: 0 0 6px; font-weight: 700;
+  transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.scene-txt p { font-size: 15px; color: #8a7a6a; margin: 0; }
+.orb {
+  width: clamp(56px, 6vw, 88px); aspect-ratio: 1; border-radius: 50%;
+  box-shadow: inset -10px -14px 24px rgba(120, 80, 50, 0.18), 0 18px 34px rgba(160, 110, 80, 0.22);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.scene-row:hover .orb { transform: translateY(-10px) scale(1.06); }
+.scene-row:hover h3 { transform: translateX(10px); }
+
+.flow { padding: 14vh clamp(20px, 6vw, 90px); max-width: 860px; margin: 0 auto; }
+.flow-steps { position: relative; padding-left: clamp(28px, 4vw, 56px); }
+.flow-line {
+  position: absolute; left: 8px; top: 8px; bottom: 8px; width: 2px;
+  background: linear-gradient(#f2b56b, #e8896b, #93ab84); opacity: 0.5;
+}
+.flow-step { padding: 4.5vh 0; }
+.flow-tag {
+  display: inline-block; font-size: 12px; letter-spacing: 0.3em;
+  color: #3a2e24; padding: 6px 14px; border-radius: 999px; margin-bottom: 14px;
+}
+.flow-step h3 {
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-size: clamp(24px, 3.2vw, 40px); color: #3a2e24; margin: 0 0 8px; font-weight: 700;
+}
+.flow-step p { font-size: 15px; color: #8a7a6a; margin: 0; max-width: 560px; }
+
+.finale {
+  min-height: 92svh; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; text-align: center; padding: 10vh 24px 0;
+}
+.finale-title {
+  font-family: Georgia, 'Songti SC', 'SimSun', serif;
+  font-size: clamp(40px, 7vw, 96px); color: #3a2e24; margin: 0 0 5vh; font-weight: 700; line-height: 1.15;
+}
+.finale-actions { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+.big-btn {
+  font-size: 17px; font-weight: 600; text-decoration: none;
+  color: #fff6ea; background: #3a2e24; padding: 18px 44px; border-radius: 999px;
+  box-shadow: 0 12px 34px rgba(58, 46, 36, 0.2);
+  transition: transform 0.35s, background 0.35s;
+}
+.big-btn:hover { transform: translateY(-3px); background: #e8896b; }
+.ghost-btn {
+  font-size: 15px; text-decoration: none; color: #6b5d50;
+  padding: 18px 30px; border-radius: 999px; border: 1.5px solid rgba(58, 46, 36, 0.22);
+  transition: color 0.3s, border-color 0.3s;
+}
+.ghost-btn:hover { color: #3a2e24; border-color: #3a2e24; }
+.foot {
+  margin-top: 12vh; padding: 26px 0 34px; width: 100%;
+  border-top: 1px solid rgba(58, 46, 36, 0.12);
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  font-size: 12.5px; color: #8a7a6a; letter-spacing: 0.06em;
+}
+
+/* ================= 应用外壳（对话 / 知识库） ================= */
+.app-shell { display: flex; height: 100vh; overflow: hidden; }
+.sidebar {
+  width: 240px; flex-shrink: 0;
+  background: #fbfbfc; border-right: 1px solid var(--border); color: var(--text-main);
+  display: flex; flex-direction: column;
+}
+.sidebar .logo {
+  padding: 18px 16px; font-weight: 700; font-size: 16px; color: var(--text-main);
+  border-bottom: 1px solid var(--border); letter-spacing: .5px;
+}
+.sidebar .logo small { display: block; font-size: 11px; font-weight: 400; color: var(--text-sub); margin-top: 3px; }
+.sidebar .new-btn {
+  margin: 12px; padding: 9px 0; border: none; border-radius: 999px;
+  background: var(--agent-main); color: #fff; font-size: 14px; font-weight: 600;
+  transition: filter .2s;
+}
+.sidebar .new-btn:hover { filter: brightness(1.08); }
+.sidebar .session-list { flex: 1; overflow-y: auto; padding: 0 8px; }
+.session-item {
+  padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 2px; white-space: nowrap; overflow: hidden; gap: 6px;
+}
+.session-item:hover { background: #f1f2f4; }
+.session-item.active { background: rgba(217, 105, 74, .1); color: var(--agent-main); font-weight: 600; }
+.session-item .title { overflow: hidden; text-overflow: ellipsis; }
+.session-item .del {
+  flex-shrink: 0; width: 20px; height: 20px; line-height: 18px; text-align: center;
+  border-radius: 50%; color: var(--text-sub); font-size: 13px; visibility: hidden;
+}
+.session-item:hover .del { visibility: visible; }
+.session-item .del:hover { background: #e9ebee; color: var(--text-main); }
+.sidebar .empty-tip { padding: 14px 12px; font-size: 12px; color: var(--text-sub); }
+.sidebar .footer-link {
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  display: flex; gap: 10px;
+}
+.sidebar .footer-link button {
+  flex: 1; padding: 7px 0; font-size: 12.5px; border-radius: 999px;
+  border: 1px solid var(--border); background: #fff; color: var(--text-main);
+  transition: background .2s;
+}
+.sidebar .footer-link button:hover { background: #f1f2f4; }
+.sidebar .footer-link button.active { background: var(--agent-main); border-color: var(--agent-main); color: #fff; }
+
+.main-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.header-bar {
+  height: 56px; flex-shrink: 0; background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; gap: 12px;
+}
+.agent-dots { display: flex; gap: 14px; flex-wrap: wrap; }
+.header-bar .dot { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-sub); }
+.header-bar .dot .led { width: 8px; height: 8px; border-radius: 50%; background: #d8dce2; }
+.header-bar .dot.active .led { background: var(--dot-color); animation: breathe 1.1s ease-in-out infinite; }
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+  50% { box-shadow: 0 0 8px 2px var(--dot-color); opacity: .75; }
+}
+.tag {
+  font-size: 12px; padding: 3px 10px; border-radius: 6px;
+  border: 1px solid var(--border); color: var(--text-sub); white-space: nowrap;
+}
+.tag.success { color: #7a9a68; border-color: #cddcb9; background: #f3f7ea; }
+
+/* ---------- 聊天 ---------- */
+.chat-window { flex: 1; overflow-y: auto; padding: 24px 0; }
+.chat-inner { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+.empty-hero {
+  padding-top: 9vh; text-align: center;
+  animation: fade-up .7s cubic-bezier(.16, 1, .3, 1) both;
+}
+.empty-hero .e-kicker {
+  font-size: 12px; font-weight: 600; letter-spacing: .35em;
+  color: var(--agent-main); margin: 0 0 14px;
+}
+.empty-hero h2 {
+  font-size: 30px; font-weight: 700; letter-spacing: -.5px;
+  color: var(--text-main); margin: 0 0 10px;
+}
+.empty-hero h2 em { font-style: normal; color: var(--agent-main); }
+.empty-hero .e-sub { font-size: 14px; color: var(--text-sub); margin: 0 0 34px; }
+.scene-grid {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 14px; max-width: 700px; margin: 0 auto;
+}
+.scene-card {
+  --c: var(--agent-main);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+  width: 212px; padding: 16px; text-align: left;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  cursor: pointer; font-family: inherit;
+  transition: transform .25s cubic-bezier(.16, 1, .3, 1), border-color .25s, box-shadow .25s;
+}
+.scene-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--c);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .06);
+}
+.scene-card .s-chip {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 17px;
+  background: color-mix(in srgb, var(--c) 14%, #ffffff);
+}
+.scene-card .s-name { font-weight: 600; font-size: 14px; color: var(--text-main); }
+.scene-card .s-q {
+  font-size: 12px; color: var(--text-sub); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .empty-hero { animation: none; }
+}
+
+.msg-user { display: flex; justify-content: flex-end; margin-bottom: 18px; }
+.msg-user .bubble {
+  background: #26272b; color: #fff;
+  padding: 10px 16px; border-radius: 14px 14px 4px 14px;
+  max-width: 70%; white-space: pre-wrap; font-size: 14px; line-height: 1.6;
+}
+
+.agent-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-left: 4px solid var(--card-color);
+  border-radius: 12px; padding: 14px 18px; margin-bottom: 14px;
+}
+.agent-card .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.agent-card .avatar {
+  width: 28px; height: 28px; border-radius: 8px; background: var(--card-color);
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.agent-card .name { font-weight: 600; font-size: 14px; color: var(--card-color); }
+.agent-card .status { font-size: 12px; color: var(--text-sub); margin-left: auto; }
+.agent-card .caret {
+  display: inline-block; width: 7px; height: 15px; background: var(--card-color);
+  vertical-align: text-bottom; margin-left: 2px; animation: blink .8s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+.card-thinking { font-size: 13px; color: var(--text-sub); padding: 4px 0; }
+
+.summary-card {
+  border: 1.5px solid var(--agent-main) !important;
+  background: linear-gradient(180deg, #fff7f4, #ffffff) !important;
+  box-shadow: 0 4px 16px rgba(217, 105, 74, .1);
+}
+
+.route-timeline {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 18px; margin-bottom: 14px; font-size: 13px;
+}
+.route-timeline .r-title { color: var(--text-sub); margin-bottom: 8px; }
+.route-timeline .r-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.route-timeline .r-node { padding: 4px 12px; border-radius: 20px; color: #fff; font-size: 12px; }
+.route-timeline .r-node.running { animation: pulse-node 1.2s ease-in-out infinite; }
+.route-timeline .r-node.done { opacity: .85; }
+@keyframes pulse-node { 50% { transform: scale(1.06); } }
+.route-timeline .r-arrow { color: #c2c7cf; }
+
+/* ---------- 输入区 ---------- */
+.input-bar { flex-shrink: 0; padding: 12px 0 18px; background: var(--bg-page); }
+.input-inner { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip {
+  font-size: 12px; padding: 5px 12px; border-radius: 14px; cursor: pointer;
+  background: var(--bg-card); border: 1px solid var(--border); color: var(--text-sub);
+}
+.chip:hover { border-color: var(--agent-main); color: var(--agent-main); }
+.chip.disabled { opacity: .5; pointer-events: none; }
+.input-row { display: flex; gap: 10px; }
+.input-row textarea {
+  flex: 1; resize: none; border: 1px solid var(--border); border-radius: 12px;
+  padding: 11px 14px; font-size: 14px; font-family: inherit; outline: none; height: 46px;
+  background: var(--bg-card);
+}
+.input-row textarea:focus { border-color: var(--agent-main); }
+.send-btn {
+  border: none; border-radius: 999px; padding: 0 26px; font-size: 14px; font-weight: 600;
+  background: var(--agent-main); color: #fff; transition: filter .2s;
+}
+.send-btn:hover { filter: brightness(1.06); }
+.send-btn:disabled { filter: grayscale(.4) brightness(.98); cursor: not-allowed; }
+
+/* ---------- markdown ---------- */
+.md-body { font-size: 14px; line-height: 1.75; word-break: break-word; }
+.md-body h1, .md-body h2, .md-body h3 { margin: 12px 0 8px; font-size: 15.5px; }
+.md-body p { margin: 6px 0; }
+.md-body ul, .md-body ol { padding-left: 22px; margin: 6px 0; }
+.md-body code { background: #f4f5f7; color: #b4533a; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+.md-body pre { background: #212429; color: #e8eaed; padding: 12px 14px; border-radius: 10px; overflow-x: auto; }
+.md-body pre code { background: transparent; color: inherit; padding: 0; }
+.md-body table { border-collapse: collapse; margin: 10px 0; width: 100%; }
+.md-body th, .md-body td { border: 1px solid var(--border); padding: 6px 10px; font-size: 13px; }
+.md-body th { background: #f7f8fa; }
+.md-body blockquote { border-left: 3px solid #dfe2e6; margin: 8px 0; padding: 2px 12px; color: var(--text-sub); }
+
+/* ---------- 知识库 ---------- */
+.docs-page { padding: 24px; max-width: 960px; margin: 0 auto; width: 100%; overflow-y: auto; }
+.doc-card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  margin-bottom: 20px;
+}
+.doc-card .card-header {
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  font-weight: 600; font-size: 14.5px;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+.doc-card .card-body { padding: 18px; }
+.drop-zone {
+  border: 1.5px dashed var(--border); border-radius: 10px; padding: 34px 16px;
+  text-align: center; color: var(--text-sub); font-size: 14px; cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--agent-main); background: #fff7f4; }
+.drop-zone .icon { font-size: 34px; margin-bottom: 8px; }
+.drop-zone em { color: var(--agent-main); font-style: normal; }
+.upload-meta { margin-top: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.radio-group { display: flex; gap: 14px; font-size: 13px; color: var(--text-main); }
+.radio-group label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.progress-wrap { margin-top: 14px; }
+.progress-track { height: 8px; background: #f0f1f3; border-radius: 99px; overflow: hidden; }
+.progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--agent-main), #eab27a); border-radius: 99px; transition: width .2s; }
+.progress-text { font-size: 12px; color: var(--text-sub); margin-top: 6px; }
+
+.doc-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.doc-table th, .doc-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+.doc-table th { color: var(--text-sub); font-weight: 600; background: #f7f8fa; font-size: 12.5px; }
+.doc-table tr:hover td { background: #fafbfc; }
+.doc-table .ops { color: #f56c6c; cursor: pointer; border: none; background: none; font-size: 13px; padding: 0; }
+.doc-table .ops:hover { text-decoration: underline; }
+.mini-tag { font-size: 12px; padding: 2px 9px; border-radius: 5px; }
+.mini-tag.ok { background: #f3f7ea; color: #7a9a68; border: 1px solid #cddcb9; }
+.mini-tag.parsing { background: #f4f4f5; color: #909399; border: 1px solid #e9e9eb; }
+.empty-row { text-align: center; color: var(--text-sub); padding: 26px 0 !important; }
+
+/* ---------- Toast / 确认框 ---------- */
+#toast-wrap {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 999; display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+.toast {
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .1);
+  padding: 10px 18px; font-size: 13.5px; color: var(--text-main);
+  animation: toast-in .25s ease;
+}
+.toast.success { border-color: #c2e7b0; color: #67c23a; }
+.toast.warning { border-color: #f3d19e; color: #e6a23c; }
+.toast.error { border-color: #fbc4c4; color: #c45656; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } }
+
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(29, 33, 41, .45); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal {
+  background: #fff; border-radius: 14px; padding: 24px 26px; width: 360px; max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  animation: toast-in .2s ease;
+}
+.modal h4 { margin: 0 0 10px; font-size: 16px; }
+.modal p { margin: 0 0 20px; font-size: 13.5px; color: var(--text-sub); line-height: 1.6; }
+.modal .modal-btns { display: flex; justify-content: flex-end; gap: 10px; }
+.modal .btn {
+  padding: 8px 20px; border-radius: 8px; font-size: 13.5px; border: 1px solid var(--border);
+  background: #fff; color: var(--text-main);
+}
+.modal .btn.primary { background: #f56c6c; border-color: #f56c6c; color: #fff; }
+
+@media (max-width: 720px) {
+  .sidebar { width: 64px; }
+  .sidebar .logo { font-size: 0; padding: 16px 8px; text-align: center; }
+  .sidebar .logo small { display: none; }
+  .sidebar .new-btn { font-size: 18px; padding: 8px 0; }
+  .session-item .title, .session-item .del, .sidebar .empty-tip { display: none; }
+  .sidebar .footer-link button { font-size: 15px; }
+  .agent-dots .dot span.lbl { display: none; }
+  .scene-row { grid-template-columns: 40px 1fr auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { transition: none; opacity: 1; transform: none; }
+  .scroll-cue span, .blob { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 视图一：起始页 ============ -->
+<div id="view-landing" class="landing">
+  <div class="bg-field" id="bgField"></div>
+  <div class="blob-field" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+  <div class="grain"></div>
+
+  <nav class="nav">
+    <a href="#/" class="brand">UniGrow<span class="brand-dot">.</span></a>
+    <div class="nav-right">
+      <a href="#/docs" class="nav-link">知识库</a>
+      <a href="#/chat" class="nav-cta">开始对话 →</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <p class="hero-kicker reveal">智学成长 AGENT</p>
+    <h1 class="hero-title reveal">UniGrow<span class="dot">.</span></h1>
+    <p class="hero-sub reveal">一颗会成长的 AI，陪你走完大学的每一段路。</p>
+    <p class="hero-line reveal">学习 · 科研 · 竞赛 · 求职 · 校园 —— 五种成长，一个入口。</p>
+    <a href="#/chat" class="hero-btn reveal">与主 Agent 聊聊 →</a>
+    <div class="scroll-cue" aria-hidden="true"><span></span></div>
+  </section>
+
+  <section class="scenes">
+    <header class="sec-head">
+      <p class="sec-no reveal">02 — 场景</p>
+      <h2 class="sec-title reveal">五颗成长星球</h2>
+    </header>
+    <div class="scene-row reveal">
+      <span class="scene-idx">01</span>
+      <div class="scene-txt"><h3>学习 Agent</h3><p>课件 PDF 即传即问，重点 · 难点 · 考点一键成笔记。</p></div>
+      <div class="orb" style="background: radial-gradient(circle at 32% 28%, #ffd9c0, #ff9e7a 68%, #f08a63)"></div>
+    </div>
+    <div class="scene-row reveal">
+      <span class="scene-idx">02</span>
+      <div class="scene-txt"><h3>科研 Agent</h3><p>论文结构化解读，创新点与方法一目了然。</p></div>
+      <div class="orb" style="background: radial-gradient(circle at 32% 28%, #dfe8cd, #a9bf92 68%, #8ba274)"></div>
+    </div>
+    <div class="scene-row reveal">
+      <span class="scene-idx">03</span>
+      <div class="scene-txt"><h3>竞赛 Agent</h3><p>赛题分析、技术路线、周计划与团队分工。</p></div>
+      <div class="orb" style="background: radial-gradient(circle at 32% 28%, #ffe4c4, #f2b56b 68%, #dd9a4e)"></div>
+    </div>
+    <div class="scene-row reveal">
+      <span class="scene-idx">04</span>
+      <div class="scene-txt"><h3>求职 Agent</h3><p>简历逐句打磨，面试模拟到入职准备。</p></div>
+      <div class="orb" style="background: radial-gradient(circle at 32% 28%, #cfe3c2, #9cc186 68%, #7ea768)"></div>
+    </div>
+    <div class="scene-row reveal">
+      <span class="scene-idx">05</span>
+      <div class="scene-txt"><h3>校园 Agent</h3><p>图书馆、教务、活动 —— 校园生活问它就好。</p></div>
+      <div class="orb" style="background: radial-gradient(circle at 32% 28%, #cde6dd, #93c2ad 68%, #74a892)"></div>
+    </div>
+  </section>
+
+  <section class="flow">
+    <header class="sec-head">
+      <p class="sec-no reveal">03 — 协同</p>
+      <h2 class="sec-title reveal">一句话，三个 Agent 同时出发</h2>
+    </header>
+    <div class="flow-steps">
+      <div class="flow-line" aria-hidden="true"></div>
+      <div class="flow-step reveal">
+        <span class="flow-tag" style="background: #f2b56b">路由</span>
+        <h3>主 Agent 听懂你</h3>
+        <p>一句"我要参加 iCAN 比赛"，被拆解成三份子任务。</p>
+      </div>
+      <div class="flow-step reveal">
+        <span class="flow-tag" style="background: #e8896b">并行</span>
+        <h3>专业 Agent 同频出发</h3>
+        <p>竞赛、科研、学习三条链路同时生成，互不等待。</p>
+      </div>
+      <div class="flow-step reveal">
+        <span class="flow-tag" style="background: #93ab84">汇总</span>
+        <h3>一份成长行动建议</h3>
+        <p>跨 Agent 结论彼此衔接，落成可执行的下一步清单。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="finale">
+    <h2 class="finale-title reveal">让 AI，<br />见证你的成长。</h2>
+    <div class="finale-actions reveal">
+      <a href="#/chat" class="big-btn">开始对话 →</a>
+      <a href="#/docs" class="ghost-btn">先看看知识库</a>
+    </div>
+    <footer class="foot reveal">
+      <span>UniGrow Agent · 智学成长</span>
+      <span>面向大学生全生命周期的多智能体平台</span>
+    </footer>
+  </section>
+</div>
+
+<!-- ============ 视图二：对话 ============ -->
+<div id="view-chat" class="app-shell hidden">
+  <aside class="sidebar">
+    <div class="logo">🎓 UniGrow Agent<small>智学成长 · 大学生多智能体平台</small></div>
+    <button class="new-btn" id="btnNewSession">＋ 新建对话</button>
+    <div class="session-list" id="sessionList"></div>
+    <div class="footer-link">
+      <button data-nav="#/docs">📁 知识库</button>
+      <button data-nav="#/chat" class="active">💬 对话</button>
+    </div>
+  </aside>
+  <div class="main-col">
+    <header class="header-bar">
+      <div class="agent-dots" id="agentDots"></div>
+      <span class="tag success">本地演示 · 模拟响应</span>
+    </header>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-inner" id="chatInner"></div>
+    </div>
+    <div class="input-bar">
+      <div class="input-inner">
+        <div class="chips" id="chips"></div>
+        <div class="input-row">
+          <textarea id="inputText" placeholder="输入问题，Enter 发送，Shift+Enter 换行"></textarea>
+          <button class="send-btn" id="btnSend">发送</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 视图三：知识库 ============ -->
+<div id="view-docs" class="app-shell hidden">
+  <aside class="sidebar">
+    <div class="logo">🎓 UniGrow Agent<small>智学成长 · 大学生多智能体平台</small></div>
+    <button class="new-btn" id="btnDocsNew">＋ 新建对话</button>
+    <div class="session-list" id="sessionListDocs"></div>
+    <div class="footer-link">
+      <button data-nav="#/docs" class="active">📁 知识库</button>
+      <button data-nav="#/chat">💬 对话</button>
+    </div>
+  </aside>
+  <div class="main-col">
+    <header class="header-bar">
+      <div class="agent-dots" id="agentDotsDocs"></div>
+      <span class="tag success">本地演示 · 模拟解析</span>
+    </header>
+    <div class="docs-page">
+      <div class="doc-card">
+        <div class="card-header">上传学习资料（PDF，≤20MB / 300页）</div>
+        <div class="card-body">
+          <div class="drop-zone" id="dropZone">
+            <div class="icon">📄</div>
+            <div>拖拽 PDF 到此处，或 <em>点击选择文件</em></div>
+          </div>
+          <input type="file" id="fileInput" accept=".pdf" class="hidden" />
+          <div class="upload-meta">
+            <div class="radio-group" id="sceneGroup">
+              <label><input type="radio" name="scene" value="study" checked /> 📚 课程资料</label>
+              <label><input type="radio" name="scene" value="research" /> 🔬 科研论文</label>
+              <label><input type="radio" name="scene" value="career" /> 💼 简历</label>
+            </div>
+            <span class="tag">上传后即可在对话中向对应 Agent 提问</span>
+          </div>
+          <div class="progress-wrap hidden" id="progressWrap">
+            <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text" id="progressText">准备上传…</div>
+          </div>
+        </div>
+      </div>
+      <div class="doc-card">
+        <div class="card-header">
+          <span>我的知识库</span>
+          <button class="ops" id="btnRefresh" style="border:none;background:none;color:var(--agent-main);font-size:13px;">刷新</button>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table class="doc-table">
+            <thead>
+              <tr><th>文件名</th><th>场景</th><th>状态</th><th>页数</th><th>分块数</th><th>上传时间</th><th>操作</th></tr>
+            </thead>
+            <tbody id="docTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+'use strict';
+/* ==========================================================
+   0. 工具
+   ========================================================== */
+const $ = (s, el) => (el || document).querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || '');
+  t.textContent = msg;
+  $('#toast-wrap').appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s'; }, 2400);
+  setTimeout(() => t.remove(), 2800);
+}
+
+function confirmBox(title, text) {
+  return new Promise((resolve) => {
+    const mask = document.createElement('div');
+    mask.className = 'modal-mask';
+    mask.innerHTML = '<div class="modal"><h4>' + esc(title) + '</h4><p>' + esc(text) + '</p>' +
+      '<div class="modal-btns"><button class="btn" data-r="0">取消</button>' +
+      '<button class="btn primary" data-r="1">确定</button></div></div>';
+    mask.addEventListener('click', (e) => {
+      const r = e.target.getAttribute && e.target.getAttribute('data-r');
+      if (r !== null && r !== undefined && e.target.tagName === 'BUTTON') { mask.remove(); resolve(r === '1'); }
+      else if (e.target === mask) { mask.remove(); resolve(false); }
+    });
+    document.body.appendChild(mask);
+  });
+}
+
+/* 极简 Markdown 渲染（标题/加粗/行内代码/代码块/列表/引用/表格） */
+function md(src) {
+  let s = esc(src);
+  const codes = [];
+  s = s.replace(/```([\s\S]*?)```/g, (m, c) => { codes.push(c.replace(/^\n|\n$/g, '')); return '\u0000CODE' + (codes.length - 1) + '\u0000'; });
+  const lines = s.split('\n');
+  let out = [], list = null; // 'ul' | 'ol'
+  const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
+  for (let ln of lines) {
+    const t = ln.trim();
+    if (!t) { closeList(); continue; }
+    let m;
+    if ((m = t.match(/^###\s+(.*)/)) || (m = t.match(/^##\s+(.*)/)) || (m = t.match(/^#\s+(.*)/))) {
+      closeList(); out.push('<h3>' + inline(m[1]) + '</h3>');
+    } else if (/^[-*]\s+/.test(t)) {
+      if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; }
+      out.push('<li>' + inline(t.replace(/^[-*]\s+/, '')) + '</li>');
+    } else if (/^\d+[.、)]\s+/.test(t)) {
+      if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; }
+      out.push('<li>' + inline(t.replace(/^\d+[.、)]\s+/, '')) + '</li>');
+    } else if (/^>\s?/.test(t)) {
+      closeList(); out.push('<blockquote>' + inline(t.replace(/^>\s?/, '')) + '</blockquote>');
+    } else if (/^\|.+\|$/.test(t)) {
+      closeList();
+      const cells = t.slice(1, -1).split('|').map((c) => c.trim());
+      if (cells.every((c) => /^:?-{2,}:?$/.test(c))) continue; // 分隔行
+      out.push('<table><tr>' + cells.map((c) => '<td>' + inline(c) + '</td>').join('') + '</tr></table>');
+    } else {
+      closeList(); out.push('<p>' + inline(t) + '</p>');
+    }
+  }
+  closeList();
+  let html = out.join('');
+  html = html.replace(/\u0000CODE(\d+)\u0000/g, (m, i) => '<pre><code>' + codes[+i] + '</code></pre>');
+  return html;
+
+  function inline(x) {
+    return x
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  }
+}
+
+/* ==========================================================
+   1. 本地数据（localStorage）
+   ========================================================== */
+const LS_SESS = 'unigrow_sessions_v1';
+const LS_DOCS = 'unigrow_docs_v1';
+
+function loadJSON(key, def) { try { return JSON.parse(localStorage.getItem(key)) || def; } catch { return def; } }
+function saveJSON(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }
+
+let sessions = loadJSON(LS_SESS, []);   // [{id,title,messages:[...]}]
+let docs = loadJSON(LS_DOCS, []);       // [{id,filename,scene,status,pages,chunk_count,created_at}]
+
+const AGENT_META = {
+  study:       { label: '学习Agent', icon: '📚', color: '#E8896B' },
+  research:    { label: '科研Agent', icon: '🔬', color: '#93AB84' },
+  competition: { label: '竞赛Agent', icon: '🏆', color: '#DFA453' },
+  career:      { label: '求职Agent', icon: '💼', color: '#86AD72' },
+  campus:      { label: '校园Agent', icon: '🏫', color: '#7FB39C' },
+  main:        { label: '主Agent',   icon: '🧭', color: '#D9694A' }
+};
+const AGENT_ORDER = ['study', 'research', 'competition', 'career', 'campus', 'main'];
+
+/* ==========================================================
+   2. 路由（hash 切换三视图）
+   ========================================================== */
+const views = { '#/': 'view-landing', '#/chat': 'view-chat', '#/docs': 'view-docs' };
+function applyRoute() {
+  let h = location.hash || '#/';
+  if (!views[h]) h = '#/';
+  Object.keys(views).forEach((k) => $('#' + views[k]).classList.toggle('hidden', k !== h));
+  document.body.style.overflow = h === '#/' ? '' : 'hidden';
+  if (h === '#/chat') { renderSessions('sessionList'); renderSessions('sessionListDocs'); }
+  if (h === '#/docs') { renderDocs(); renderSessions('sessionListDocs'); renderSessions('sessionList'); }
+}
+window.addEventListener('hashchange', applyRoute);
+
+document.querySelectorAll('[data-nav]').forEach((b) =>
+  b.addEventListener('click', () => { location.hash = b.getAttribute('data-nav'); })
+);
+
+/* ==========================================================
+   3. 起始页动效（滚动背景色插值 + 章节浮现）
+   ========================================================== */
+(function landingFx() {
+  const PALETTE = ['#fff6ea', '#fdece1', '#f2f0e4', '#f7e8d8'];
+  const bgField = $('#bgField');
+  const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  let cur = hex2rgb(PALETTE[0]), target = cur.slice();
+  const sections = () => Array.from(document.querySelectorAll('#view-landing .hero, #view-landing .scenes, #view-landing .flow, #view-landing .finale'));
+
+  function updateTarget() {
+    if ($('#view-landing').classList.contains('hidden')) return;
+    const mid = window.scrollY + window.innerHeight * 0.5;
+    const secs = sections();
+    for (let i = 0; i < secs.length; i++) {
+      const top = secs[i].offsetTop, bottom = top + secs[i].offsetHeight;
+      if (mid >= top && mid < bottom) { target = hex2rgb(PALETTE[i]); return; }
+      if (mid >= bottom && i === secs.length - 1) target = hex2rgb(PALETTE[i]);
+    }
+  }
+  function loop() {
+    cur = cur.map((c, i) => c + (target[i] - c) * 0.06);
+    bgField.style.background = 'rgb(' + cur.map((c) => Math.round(c)).join(',') + ')';
+    requestAnimationFrame(loop);
+  }
+  window.addEventListener('scroll', updateTarget, { passive: true });
+  updateTarget(); loop();
+
+  const io = new IntersectionObserver(
+    (es) => es.forEach((e) => e.isIntersecting && e.target.classList.add('in')),
+    { threshold: 0.18 }
+  );
+  document.querySelectorAll('#view-landing .reveal').forEach((el, i) => {
+    el.style.transitionDelay = (i % 4) * 90 + 'ms';
+    io.observe(el);
+  });
+})();
+
+/* ==========================================================
+   4. 对话：状态 + 渲染
+   ========================================================== */
+const chat = {
+  currentSessionId: null,
+  messages: [],          // {kind:'user'|'route'|'agent'|'summary'|'error', ...}
+  streaming: false,
+  activeAgents: []
+};
+
+const EXAMPLES = [
+  '我要参加iCAN比赛，帮我全面规划一下',
+  '帮我总结这份课件的考点',
+  '分析一下挑战杯的赛题怎么入手',
+  '帮我优化简历并模拟一场面试',
+  '图书馆几点开门？怎么预约自习室？'
+];
+
+/* ---- 空态场景入口 ---- */
+const SCENES = [
+  { icon: '📚', name: '学习', color: '#E8896B', q: '帮我总结这份课件的考点' },
+  { icon: '🔬', name: '科研', color: '#93AB84', q: '帮我分析一篇论文的创新点与研究方法' },
+  { icon: '🏆', name: '竞赛', color: '#DFA453', q: '我要参加iCAN比赛，帮我全面规划一下' },
+  { icon: '💼', name: '求职', color: '#86AD72', q: '帮我优化简历并模拟一场面试' },
+  { icon: '🏫', name: '校园', color: '#7FB39C', q: '图书馆几点开门？怎么预约自习室？' }
+];
+
+/* ---- 顶栏 Agent 呼吸灯 ---- */
+function renderAgentDots(elId) {
+  const wrap = $('#' + elId);
+  wrap.innerHTML = '';
+  AGENT_ORDER.forEach((name) => {
+    const a = AGENT_META[name];
+    const d = document.createElement('div');
+    d.className = 'dot' + (chat.activeAgents.includes(name) ? ' active' : '');
+    d.style.setProperty('--dot-color', a.color);
+    d.innerHTML = '<span class="led"></span>' + a.icon + ' <span class="lbl">' + a.label.replace('Agent', '') + '</span>';
+    wrap.appendChild(d);
+  });
+}
+
+/* ---- 聊天区渲染（全量重绘，量小无性能问题） ---- */
+function renderChat() {
+  const inner = $('#chatInner');
+  if (!chat.messages.length) {
+    inner.innerHTML = '<div class="empty-hero">' +
+      '<p class="e-kicker">UNIGROW AGENT</p>' +
+      '<h2>今天，想往哪个方向<em>成长</em>？</h2>' +
+      '<p class="e-sub">一句话，五位专业 Agent 同时为你出发</p>' +
+      '<div class="scene-grid">' + SCENES.map((s) =>
+        '<button class="scene-card" style="--c:' + s.color + '" data-q="' + esc(s.q) + '">' +
+          '<span class="s-chip">' + s.icon + '</span>' +
+          '<span class="s-name">' + s.name + '</span>' +
+          '<span class="s-q">' + esc(s.q) + '</span>' +
+        '</button>').join('') +
+      '</div></div>';
+    inner.querySelectorAll('.scene-card').forEach((b) => {
+      b.addEventListener('click', () => {
+        if (!$('#btnSend').disabled) send(b.dataset.q);
+      });
+    });
+    renderAgentDots('agentDots');
+    return;
+  }
+  let html = '';
+  chat.messages.forEach((m) => {
+    if (m.kind === 'user') {
+      html += '<div class="msg-user"><div class="bubble">' + esc(m.text) + '</div></div>';
+    } else if (m.kind === 'route') {
+      html += routeHTML(m.plan);
+    } else if (m.kind === 'agent') {
+      html += agentCardHTML(m, false);
+    } else if (m.kind === 'summary') {
+      html += agentCardHTML(m, true);
+    } else if (m.kind === 'error') {
+      html += '<div class="err-box" style="background:#fef0f0;border:1px solid #fbc4c4;color:#c45656;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:14px">⚠️ ' + esc(m.text) + '</div>';
+    }
+  });
+  inner.innerHTML = html;
+  renderAgentDots('agentDots');
+  scrollChat();
+}
+
+function routeHTML(plan) {
+  let h = '<div class="route-timeline"><div class="r-title">🧭 主Agent 调度链路 — ' + esc(plan.plan_summary) + '</div><div class="r-flow">';
+  h += '<span class="r-node" style="background:#D9694A">主Agent · 路由</span>';
+  plan.agents.forEach((a, i) => {
+    h += '<span class="r-arrow">' + (i === 0 && plan.complexity === 'multi' ? '⇒ 并行 ⇒' : '→') + '</span>';
+    const running = chat.activeAgents.includes(a.name);
+    h += '<span class="r-node ' + (running ? 'running' : 'done') + '" style="background:' + a.color + '">' +
+      a.icon + ' ' + a.label + (plan.complexity === 'multi' && plan.agents.length > 1 ? ' ∥' : '') + '</span>';
+  });
+  if (plan.complexity === 'multi') h += '<span class="r-arrow">→</span><span class="r-node" style="background:#D9694A">🧭 汇总</span>';
+  return h + '</div></div>';
+}
+
+function agentCardHTML(m, isSummary) {
+  const color = isSummary ? '#D9694A' : m.color;
+  const icon = isSummary ? '🧭' : m.icon;
+  const name = isSummary ? (m.label || '主Agent · 综合建议') : m.label;
+  const status = isSummary ? (m.streaming ? '汇总中…' : '已完成')
+    : (m.streaming ? '生成中…' : m.error ? '出错了' : '已完成');
+  let body;
+  if (m.error) body = '<div class="err-box" style="background:#fef0f0;border:1px solid #fbc4c4;color:#c45656;border-radius:8px;padding:8px 12px;font-size:13px">⚠️ ' + esc(m.error) + '</div>';
+  else if (m.content) body = '<div class="md-body">' + md(m.content) + (m.streaming ? '<span class="caret"></span>' : '') + '</div>';
+  else if (m.streaming) body = '<div class="card-thinking">' + (isSummary ? '正在整合各Agent结论…' : '正在思考…') + '</div>';
+  else body = '';
+  return '<div class="agent-card' + (isSummary ? ' summary-card' : '') + '" style="--card-color:' + color + '">' +
+    '<div class="card-head"><div class="avatar">' + icon + '</div><span class="name">' + esc(name) + '</span>' +
+    '<span class="status">' + status + '</span></div>' + body + '</div>';
+}
+
+function scrollChat() {
+  const w = $('#chatWindow');
+  w.scrollTop = w.scrollHeight;
+}
+
+/* ---- 侧栏会话列表 ---- */
+function renderSessions(elId) {
+  const wrap = $('#' + elId);
+  if (!wrap) return;
+  if (!sessions.length) {
+    wrap.innerHTML = '<div class="empty-tip">还没有对话，发一条消息开始吧</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  sessions.forEach((s) => {
+    const d = document.createElement('div');
+    d.className = 'session-item' + (s.id === chat.currentSessionId ? ' active' : '');
+    d.innerHTML = '<span class="title">' + esc(s.title) + '</span><span class="del" title="删除">✕</span>';
+    d.addEventListener('click', () => {
+      if (chat.streaming) { toast('生成中，请稍候', 'warning'); return; }
+      selectSession(s.id);
+    });
+    d.querySelector('.del').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (chat.streaming) { toast('生成中，请稍候', 'warning'); return; }
+      const ok = await confirmBox('删除对话', '确定删除「' + s.title + '」吗？该操作不可恢复。');
+      if (!ok) return;
+      sessions = sessions.filter((x) => x.id !== s.id);
+      saveJSON(LS_SESS, sessions);
+      if (chat.currentSessionId === s.id) newSession();
+      renderSessions('sessionList'); renderSessions('sessionListDocs');
+      toast('已删除', 'success');
+    });
+    wrap.appendChild(d);
+  });
+}
+
+function selectSession(id) {
+  const s = sessions.find((x) => x.id === id);
+  if (!s) return;
+  chat.currentSessionId = id;
+  chat.messages = s.messages.map((m) => JSON.parse(JSON.stringify(m)));
+  chat.messages.forEach((m) => { m.streaming = false; });
+  chat.activeAgents = [];
+  renderChat();
+  renderSessions('sessionList'); renderSessions('sessionListDocs');
+}
+
+function newSession() {
+  chat.currentSessionId = null;
+  chat.messages = [];
+  chat.activeAgents = [];
+  chat.streaming = false;
+  setInputEnabled(true);
+  renderChat();
+  renderSessions('sessionList'); renderSessions('sessionListDocs');
+}
+
+function persistCurrent() {
+  if (!chat.currentSessionId) return;
+  const s = sessions.find((x) => x.id === chat.currentSessionId);
+  if (s) {
+    s.messages = JSON.parse(JSON.stringify(chat.messages));
+    s.messages.forEach((m) => { delete m.streaming; });
+    saveJSON(LS_SESS, sessions);
+  }
+}
+
+/* ---- 输入区 ---- */
+function renderChips() {
+  const wrap = $('#chips');
+  wrap.innerHTML = '';
+  EXAMPLES.forEach((c) => {
+    const s = document.createElement('span');
+    s.className = 'chip' + (chat.streaming ? ' disabled' : '');
+    s.textContent = c;
+    s.addEventListener('click', () => { if (!chat.streaming) { $('#inputText').value = c; doSend(); } });
+    wrap.appendChild(s);
+  });
+}
+function setInputEnabled(on) {
+  $('#inputText').disabled = !on;
+  $('#btnSend').disabled = !on;
+  $('#btnSend').textContent = on ? '发送' : '生成中';
+  renderChips();
+}
+
+function doSend() {
+  const ta = $('#inputText');
+  const msg = ta.value.trim();
+  if (!msg || chat.streaming) return;
+  ta.value = '';
+  send(msg);
+}
+
+/* ==========================================================
+   5. 模拟多智能体调度引擎
+   ========================================================== */
+function routePlanOf(msg) {
+  const rules = [
+    ['competition', /竞赛|ican|挑战杯|互联网\+|创新创业|大赛|参赛|路演|报名/i],
+    ['research', /论文|科研|文献|课题|开题|实验|综述|期刊|研究/i],
+    ['study', /课件|学习|复习|考试|考点|笔记|作业|刷题|期末|挂科|绩点|课程/i],
+    ['career', /求职|实习|找工作|简历|面试|秋招|春招|offer|校招|职业/i],
+    ['campus', /校园|图书馆|自习室|宿舍|活动|社团|选课|成绩|教务|报销/i]
+  ];
+  let hit = rules.filter(([, r]) => r.test(msg)).map(([k]) => k);
+  /* 叙事彩蛋：iCAN = 竞赛 + 科研 + 学习 三线并行 */
+  if (/ican/i.test(msg)) hit = ['competition', 'research', 'study'];
+  if (!hit.length) hit = ['study'];
+  hit = [...new Set(hit)].slice(0, 3);
+  const multi = hit.length > 1;
+  return {
+    complexity: multi ? 'multi' : 'single',
+    plan_summary: multi ? '识别到复合型任务，已拆解为 ' + hit.length + ' 份子任务并行派发' : '单一领域任务，直接派发',
+    agents: hit.map((k) => ({ name: k, ...AGENT_META[k] }))
+  };
+}
+
+/* 结合知识库的上下文提示 */
+function docHint(agent) {
+  const ready = docs.filter((d) => d.status === 'ready');
+  if (!ready.length) return '';
+  const rel = ready.filter((d) => d.scene === agent || agent === 'study');
+  const d = (rel.length ? rel : ready)[(rel.length ? rel : ready).length - 1];
+  return '（已结合你上传的《' + d.filename + '》共 ' + d.pages + ' 页）\n\n';
+}
+
+const REPLY_TPL = {
+  competition: (msg) => docHint('competition') +
+'## 🎯 参赛规划\n\n针对「' + msg.slice(0, 24) + '」，我给出三步走策略：\n\n- **选题定位**：聚焦"AI + 校园场景"的痛点创新，评委更看重真实需求与落地性\n- **技术路线**：前端原型 + 后端 Agent 编排 + 演示视频，四周可完成 MVP\n- **团队分工**：队长统筹 / 2 名开发 / 1 名设计 / 1 名答辩\n\n## 📅 四周计划\n\n1. 第 1 周：赛题拆解与原型草图，确定核心亮点\n2. 第 2-3 周：开发与打磨，同步准备路演 PPT\n3. 第 4 周：模拟答辩 3 轮，录制演示视频\n\n> 提醒：iCAN 强调"原创与产业化"，报名截止前记得完成作品说明书的查重。',
+  research: (msg) => docHint('research') +
+'## 🔬 研究切入建议\n\n- **创新点提炼**：把任务拆成"方法层 + 应用层"两个创新维度，避免与已有工作同质化\n- **文献检索**：建议以近三年顶会论文为主线索，先读摘要与实验部分建立全景\n- **实验设计**：设置 baseline 对照，指标至少 3 个，保证消融实验完整\n\n## 📖 结构化解读框架\n\n| 模块 | 关注要点 |\n| --- | --- |\n| 问题定义 | 任务边界与假设 |\n| 方法 | 核心模块与动机 |\n| 实验 | 数据集、指标、对比 |\n| 局限 | 可改进点即你的机会 |\n\n需要我把某个具体论文按这个框架展开吗？',
+  study: (msg) => docHint('study') +
+'## 📚 考点笔记（自动生成）\n\n- **核心概念**：先掌握定义 → 性质 → 典型例题的链条\n- **高频考点**：近三年真题重复率约 60%，优先攻克计算大题\n- **易错点**：概念辨析题容易混淆，建议用对比表格记忆\n\n## ✅ 三天复习法\n\n1. **Day 1**：过一遍知识框架，标记薄弱章节\n2. **Day 2**：只做薄弱章节的例题 + 错题归因\n3. **Day 3**：限时模拟卷，训练答题节奏\n\n> 我可以把任意一章展开成"概念卡片 + 自测题"的模式，随时说一声。',
+  career: (msg) => docHint('career') +
+'## 💼 简历优化\n\n- **量化成果**：每段经历按"动作 + 方法 + 结果"重写，结果尽量带数字\n- **关键词对齐**：对照目标岗位 JD，把核心技能词自然嵌入经历描述\n- **一页原则**：删掉与岗位无关的信息，保持留白与可读性\n\n## 🎤 面试模拟（第一轮）\n\n1. 请用 1 分钟做自我介绍，突出与岗位最相关的一段经历\n2. 讲一个你解决过的最难的问题（STAR 法则）\n3. 反问环节：问培养机制或团队分工，避免问薪资\n\n> 回复你的答案，我会逐句点评并给出改进版本。',
+  campus: (msg) =>
+'## 🏫 校园生活指南\n\n- **开放时间**：图书馆周一至周日 7:30–22:30，考试周延长至 23:30\n- **自习室预约**：在校园 App → 空间预约 → 选楼层座位，可提前 1 天约\n- **小贴士**：早上 8 点前入馆基本免预约；离座超过 30 分钟记得暂时释放座位\n\n还需要查活动、社团或教务办事流程吗？我可以继续。'
+};
+
+const SUMMARY_TPL = (plan, msg) =>
+'## 🧭 综合成长建议\n\n围绕「' + msg.slice(0, 24) + '」，' + plan.agents.length + ' 个 Agent 的结论已交叉整合：\n\n' +
+plan.agents.map((a, i) => (i + 1) + '. **' + a.label + '**：已给出可执行方案，见上方卡片').join('\n') +
+'\n\n### 下一步行动清单\n\n- [ ] 今天：确认目标与截止时间，写进日历\n- [ ] 本周：按各 Agent 方案完成第一步\n- [ ] 每晚：把进展同步给我，我会动态调整计划\n\n> 成长是持续迭代的过程，我一直在。';
+
+/* ---- 发送主流程：user → route → 并行 agent 流式 → summary → done ---- */
+async function send(msg) {
+  chat.streaming = true;
+  chat.activeAgents = [];
+  chat.messages.push({ kind: 'user', text: msg });
+  setInputEnabled(false);
+  renderChat();
+
+  /* 无会话则创建 */
+  if (!chat.currentSessionId) {
+    const s = { id: uid(), title: msg.slice(0, 18) || '新对话', messages: [] };
+    sessions.unshift(s);
+    chat.currentSessionId = s.id;
+    saveJSON(LS_SESS, sessions);
+    renderSessions('sessionList'); renderSessions('sessionListDocs');
+  }
+
+  const plan = routePlanOf(msg);
+
+  await sleep(500);
+  chat.messages.push({ kind: 'route', plan });
+  chat.activeAgents = plan.agents.map((a) => a.name);
+  renderChat();
+  await sleep(450);
+
+  /* 并行流式生成 */
+  const genTasks = plan.agents.map((ag) => streamCard('agent', ag.name, REPLY_TPL[ag.name](msg)));
+  await Promise.all(genTasks);
+
+  if (plan.complexity === 'multi') {
+    chat.messages.push({ kind: 'summary', content: '', streaming: true, label: '主Agent · 综合建议' });
+    chat.activeAgents.push('main');
+    renderChat();
+    await sleep(300);
+    await streamCard('summary', 'main', SUMMARY_TPL(plan, msg), true);
+  }
+
+  chat.streaming = false;
+  chat.activeAgents = [];
+  chat.messages.forEach((m) => { m.streaming = false; });
+  persistCurrent();
+  setInputEnabled(true);
+  renderChat();
+}
+
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/* 将一段文本以打字机效果写入对应卡片 */
+async function streamCard(kind, agent, text, isSummary) {
+  /* 找到/创建卡片对象 */
+  let card;
+  if (kind === 'agent') {
+    card = chat.messages.find((m) => m.kind === 'agent' && m.agent === agent && m.streaming);
+    if (!card) {
+      card = { kind: 'agent', agent, ...AGENT_META[agent], content: '', streaming: true, error: '' };
+      chat.messages.push(card);
+    }
+  } else {
+    card = [...chat.messages].reverse().find((m) => m.kind === 'summary' && m.streaming);
+    if (!card) { card = { kind: 'summary', content: '', streaming: true, label: '主Agent · 综合建议' }; chat.messages.push(card); }
+  }
+
+  let i = 0;
+  const speed = 10 + Math.random() * 10;   // 每帧毫秒
+  const chunk = () => 3 + Math.floor(Math.random() * 5); // 每帧字符数
+  await new Promise((resolve) => {
+    const timer = setInterval(() => {
+      i += chunk();
+      card.content = text.slice(0, i);
+      /* 局部刷新该卡片 DOM，避免整窗重绘闪烁 */
+      patchCard(card, isSummary);
+      scrollChat();
+      if (i >= text.length) { clearInterval(timer); resolve(); }
+    }, speed);
+  });
+  card.content = text;
+  card.streaming = false;
+  chat.activeAgents = chat.activeAgents.filter((a) => a !== (isSummary ? 'main' : agent));
+  patchCard(card, isSummary);
+  renderAgentDots('agentDots');
+}
+
+/* 按 data-cid 找到卡片节点局部更新 */
+function patchCard(card, isSummary) {
+  if (!card._cid) card._cid = uid();
+  const inner = $('#chatInner');
+  let node = inner.querySelector('[data-cid="' + card._cid + '"]');
+  if (!node) {
+    /* 卡片首次出现：追加并持久化 cid */
+    const tmp = document.createElement('div');
+    tmp.innerHTML = agentCardHTML(card, isSummary);
+    const el = tmp.firstElementChild;
+    el.setAttribute('data-cid', card._cid);
+    inner.appendChild(el);
+    renderAgentDots('agentDots');
+    return;
+  }
+  const tmp = document.createElement('div');
+  tmp.innerHTML = agentCardHTML(card, isSummary);
+  const fresh = tmp.firstElementChild;
+  fresh.setAttribute('data-cid', card._cid);
+  node.replaceWith(fresh);
+}
+
+/* ==========================================================
+   6. 知识库（模拟解析）
+   ========================================================== */
+const SCENE_LABEL = { study: '📚 课程资料', research: '🔬 科研论文', career: '💼 简历', campus: '🏫 校园' };
+
+function renderDocs() {
+  const tb = $('#docTbody');
+  if (!docs.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="empty-row">暂无文档，上传第一份 PDF 开始构建你的知识库</td></tr>';
+    return;
+  }
+  tb.innerHTML = '';
+  docs.forEach((d) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + esc(d.filename) + '</td>' +
+      '<td>' + (SCENE_LABEL[d.scene] || d.scene) + '</td>' +
+      '<td>' + (d.status === 'ready'
+        ? '<span class="mini-tag ok">就绪</span>'
+        : '<span class="mini-tag parsing">解析中</span>') + '</td>' +
+      '<td>' + d.pages + '</td>' +
+      '<td>' + d.chunk_count + '</td>' +
+      '<td>' + new Date(d.created_at).toLocaleString('zh-CN') + '</td>' +
+      '<td><button class="ops">删除</button></td>';
+    tr.querySelector('.ops').addEventListener('click', async () => {
+      const ok = await confirmBox('删除文档', '确定删除「' + d.filename + '」及其向量数据？');
+      if (!ok) return;
+      docs = docs.filter((x) => x.id !== d.id);
+      saveJSON(LS_DOCS, docs);
+      renderDocs();
+      toast('已删除', 'success');
+    });
+    tb.appendChild(tr);
+  });
+}
+
+async function handleFile(file) {
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.pdf')) { toast('目前仅支持 PDF 文件', 'warning'); return; }
+  if (file.size > 20 * 1024 * 1024) { toast('文件超过 20MB 限制', 'error'); return; }
+
+  toast('正在解析：' + file.name);
+  const wrap = $('#progressWrap'), fill = $('#progressFill'), txt = $('#progressText');
+  wrap.classList.remove('hidden');
+  const record = {
+    id: uid(), filename: file.name, scene: getScene(), status: 'parsing',
+    pages: 0, chunk_count: 0, created_at: Date.now()
+  };
+  docs.unshift(record);
+  renderDocs();
+
+  /* 模拟解析进度 */
+  const steps = [
+    [12, '上传中…'], [38, '提取文本与目录…'], [64, '切分语义分块…'],
+    [86, '生成向量索引…'], [100, '解析完成']
+  ];
+  for (const [p, label] of steps) {
+    fill.style.width = p + '%';
+    txt.textContent = file.name + ' · ' + label;
+    await sleep(320 + Math.random() * 260);
+  }
+  record.status = 'ready';
+  record.pages = 8 + Math.floor(Math.random() * 40);
+  record.chunk_count = record.pages * 3 + Math.floor(Math.random() * 10);
+  saveJSON(LS_DOCS, docs);
+  renderDocs();
+  toast(file.name + ' 解析完成，现在可以针对它提问了', 'success');
+  setTimeout(() => { wrap.classList.add('hidden'); fill.style.width = '0'; }, 1200);
+}
+
+function getScene() {
+  const r = document.querySelector('input[name="scene"]:checked');
+  return r ? r.value : 'study';
+}
+
+/* ==========================================================
+   7. 事件绑定与启动
+   ========================================================== */
+$('#btnNewSession').addEventListener('click', newSession);
+$('#btnDocsNew').addEventListener('click', () => {
+  if (chat.streaming) { toast('生成中，请稍候', 'warning'); return; }
+  newSession();
+  location.hash = '#/chat';
+});
+$('#btnSend').addEventListener('click', doSend);
+$('#inputText').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
+});
+$('#btnRefresh').addEventListener('click', () => { renderDocs(); toast('已刷新', 'success'); });
+
+const dropZone = $('#dropZone'), fileInput = $('#fileInput');
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { handleFile(fileInput.files[0]); fileInput.value = ''; });
+['dragover', 'dragenter'].forEach((ev) => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach((ev) => dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+dropZone.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+renderChips();
+renderAgentDots('agentDots');
+renderAgentDots('agentDotsDocs');
+renderDocs();
+applyRoute();
+</script>
+</body>
+</html>

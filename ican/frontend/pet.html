@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>小桃 · UniGrow 桌面宠物</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    background: linear-gradient(180deg, #fdf7ee 0%, #f9efe2 70%, #f3e6d3 100%);
+    cursor: default;
+  }
+  /* 地面 */
+  #floor {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 56px;
+    background: linear-gradient(180deg, transparent, rgba(120, 90, 60, .1));
+    border-top: 1.5px dashed rgba(150, 110, 70, .25);
+  }
+  #hint {
+    position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; color: #b09477; letter-spacing: .12em;
+    background: rgba(255, 253, 249, .8); border: 1px solid #ecdfcc;
+    padding: 7px 18px; border-radius: 999px; backdrop-filter: blur(4px);
+  }
+  #brand {
+    position: fixed; top: 16px; left: 22px; font-weight: 800; font-size: 15px; color: #4a3a2a;
+  }
+  #brand b { color: #e8896b; }
+
+  /* ---------- 宠物 ---------- */
+  #pet { position: fixed; bottom: 0; left: 200px; width: 130px; cursor: grab; z-index: 10; will-change: transform; }
+  #pet.grabbed { cursor: grabbing; }
+  #pet.flipped #body { transform: scaleX(-1); }
+  #pet.grabbed #body { animation: dangle .5s ease-in-out infinite alternate; }
+  @keyframes dangle { from { transform: rotate(-7deg); } to { transform: rotate(7deg); } }
+  #pet.grabbed .foot { animation: foot-dangle .5s ease-in-out infinite alternate !important; }
+  @keyframes foot-dangle { from { transform: translateY(2px) rotate(-14deg); } to { transform: translateY(-2px) rotate(14deg); } }
+
+  #shadow {
+    position: fixed; bottom: 10px; left: 235px; width: 90px; height: 14px;
+    background: radial-gradient(ellipse, rgba(90, 60, 35, .28), transparent 70%);
+    z-index: 5; will-change: transform, opacity;
+  }
+
+  #body {
+    position: relative; width: 118px; height: 106px; margin: 0 auto;
+    background: radial-gradient(circle at 32% 26%, #ffd3b3, #ffa887 58%, #f08a63 96%);
+    border-radius: 54% 46% 52% 48% / 62% 60% 40% 38%;
+    box-shadow: inset -10px -14px 22px rgba(180, 90, 50, .25), 0 6px 0 rgba(200, 110, 70, .35);
+    transition: transform .18s;
+    z-index: 2;
+  }
+  /* 呆毛 */
+  #body::before {
+    content: ''; position: absolute; top: -12px; left: 52px; width: 16px; height: 18px;
+    border: 4px solid #e8896b; border-radius: 50%;
+    border-bottom-color: transparent; border-left-color: transparent;
+    transform: rotate(18deg);
+  }
+  #pet.squash #body { animation: squash .45s cubic-bezier(.3, 1.4, .5, 1); }
+  @keyframes squash {
+    0% { transform: scaleY(1.18) scaleX(.82); }
+    55% { transform: scaleY(.86) scaleX(1.14); }
+    100% { transform: none; }
+  }
+  #pet.walking #body { animation: waddle .32s ease-in-out infinite alternate; }
+  @keyframes waddle { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-4px) rotate(2deg); } }
+  #pet.happy #body { animation: happy .55s cubic-bezier(.3, 1.6, .5, 1) 2; }
+  @keyframes happy {
+    0%, 100% { transform: none; }
+    30% { transform: translateY(-14px) rotate(-5deg) scale(1.04); }
+    60% { transform: translateY(-4px) rotate(5deg); }
+  }
+
+  .eye {
+    position: absolute; top: 38px; width: 13px; height: 15px;
+    background: #4a3020; border-radius: 50%;
+    transition: transform .12s;
+  }
+  .eye.l { left: 30px; } .eye.r { right: 30px; }
+  .eye::after {
+    content: ''; position: absolute; top: 2.5px; left: 3px; width: 4.5px; height: 4.5px;
+    background: #fff; border-radius: 50%; opacity: .95;
+  }
+  #pet.blink .eye { transform: scaleY(.08); }
+  #pet.sleep .eye { transform: scaleY(.08); height: 11px; }
+  #pet.grabbed .eye { transform: scaleY(.55) translateY(3px); }
+
+  .cheek {
+    position: absolute; top: 56px; width: 14px; height: 8px;
+    background: rgba(255, 120, 90, .4); border-radius: 50%; filter: blur(1px);
+  }
+  .cheek.l { left: 18px; } .cheek.r { right: 18px; }
+
+  .mouth {
+    position: absolute; top: 58px; left: 50%; width: 16px; height: 9px;
+    transform: translateX(-50%);
+    border: 3px solid #4a3020; border-top: none; border-left-color: transparent; border-right-color: transparent;
+    border-radius: 0 0 16px 16px;
+    transition: all .2s;
+  }
+  #pet.talk .mouth { height: 5px; width: 20px; }
+  #pet.sleep .mouth { top: 54px; width: 10px; }
+
+  .foot {
+    position: absolute; bottom: -7px; width: 26px; height: 15px;
+    background: #e07a55; border-radius: 50%;
+    box-shadow: inset 0 -3px 0 rgba(150, 70, 40, .4);
+    z-index: 1;
+  }
+  .foot.fl { left: 24px; } .foot.fr { right: 24px; }
+  #pet.walking .foot.fl { animation: step .32s ease-in-out infinite alternate; }
+  #pet.walking .foot.fr { animation: step .32s ease-in-out infinite alternate-reverse; }
+  @keyframes step { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+
+  /* 睡觉的 Z */
+  .zzz {
+    position: absolute; top: -16px; right: 6px; color: #b09477;
+    font-weight: 700; font-size: 14px; animation: zfloat 2.4s ease-in-out infinite; opacity: 0;
+  }
+  #pet.sleep .zzz { opacity: 1; }
+  .zzz.z2 { top: -34px; right: -8px; font-size: 17px; animation-delay: 1.2s; }
+  @keyframes zfloat {
+    0% { transform: translateY(4px) scale(.8); opacity: 0; }
+    40% { opacity: .9; }
+    100% { transform: translateY(-16px) scale(1.1); opacity: 0; }
+  }
+
+  /* 爱心粒子 */
+  .heart {
+    position: fixed; font-size: 18px; pointer-events: none; z-index: 50;
+    animation: heart-up 1s ease-out forwards;
+  }
+  @keyframes heart-up {
+    from { transform: translateY(0) scale(.6); opacity: 1; }
+    to { transform: translateY(-70px) scale(1.25); opacity: 0; }
+  }
+
+  /* ---------- 气泡 / 聊天 ---------- */
+  .bubble {
+    position: fixed; z-index: 30; max-width: 300px;
+    background: #fffdfa; border: 1.5px solid #ecdfcc; border-radius: 16px 16px 16px 5px;
+    padding: 10px 14px; font-size: 13.5px; line-height: 1.6; color: #3a2e24;
+    box-shadow: 0 10px 30px rgba(90, 60, 35, .15);
+    opacity: 0; transform: translateY(8px) scale(.96); pointer-events: none;
+    transition: opacity .25s, transform .25s cubic-bezier(.16, 1, .3, 1);
+  }
+  .bubble.show { opacity: 1; transform: none; pointer-events: auto; }
+  .bubble::after {
+    content: ''; position: absolute; bottom: -9px; left: 24px;
+    border: 8px solid transparent; border-top-color: #fffdfa; border-right-color: #fffdfa;
+    filter: drop-shadow(0 2px 0 #ecdfcc);
+  }
+
+  #chat {
+    position: fixed; z-index: 40; width: 300px;
+    background: #fffdfa; border: 1.5px solid #ecdfcc; border-radius: 18px;
+    box-shadow: 0 16px 44px rgba(90, 60, 35, .22);
+    opacity: 0; transform: translateY(10px) scale(.96); pointer-events: none;
+    transition: opacity .25s, transform .28s cubic-bezier(.16, 1, .3, 1);
+    overflow: hidden;
+  }
+  #chat.show { opacity: 1; transform: none; pointer-events: auto; }
+  #chat .head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 14px; background: linear-gradient(135deg, #ffe9d8, #fff6ea);
+    border-bottom: 1px solid #f0e5d3; font-size: 13px; font-weight: 700; color: #3a2e24;
+  }
+  #chat .head .dot { width: 8px; height: 8px; border-radius: 50%; background: #7a9a68; animation: brea 1.4s ease-in-out infinite; }
+  @keyframes brea { 50% { opacity: .4; } }
+  #chat .head .x {
+    margin-left: auto; border: none; background: none; cursor: pointer;
+    color: #b09477; font-size: 15px;
+  }
+  #chat .head .x:hover { color: #3a2e24; }
+  #chat .log {
+    max-height: 220px; overflow-y: auto; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 8px; user-select: text;
+  }
+  #chat .log::-webkit-scrollbar { width: 4px; }
+  #chat .log::-webkit-scrollbar-thumb { background: #e8d9c2; border-radius: 4px; }
+  .m { max-width: 82%; padding: 7px 11px; border-radius: 12px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+  .m.pet { background: #fff1e4; color: #6b4423; border-bottom-left-radius: 4px; align-self: flex-start; }
+  .m.me { background: #4a3a2a; color: #fff6ea; border-bottom-right-radius: 4px; align-self: flex-end; }
+  #chat .in { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #f0e5d3; }
+  #chat .in input {
+    flex: 1; border: 1px solid #ecdfcc; border-radius: 10px; outline: none;
+    padding: 8px 11px; font-size: 13px; font-family: inherit; background: #fffdf9; color: #3a2e24;
+  }
+  #chat .in input:focus { border-color: #e8896b; }
+  #chat .in button {
+    border: none; border-radius: 10px; background: #e8896b; color: #fff;
+    padding: 0 15px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  #chat .in button:hover { background: #dd7a5b; }
+</style>
+</head>
+<body>
+<div id="brand">UniGrow<b>.</b> 桌面宠物</div>
+<div id="hint">🖱 拖拽我 · 单击聊天 · 双击摸摸头</div>
+<div id="floor"></div>
+
+<div id="shadow"></div>
+<div id="pet">
+  <span class="zzz">z</span><span class="zzz z2">Z</span>
+  <div id="body">
+    <div class="eye l"></div><div class="eye r"></div>
+    <div class="cheek l"></div><div class="cheek r"></div>
+    <div class="mouth"></div>
+  </div>
+  <div class="foot fl"></div><div class="foot fr"></div>
+</div>
+
+<div class="bubble" id="speech"></div>
+
+<div id="chat">
+  <div class="head"><span class="dot"></span>小桃 · 桌面伙伴<button class="x" id="chatClose">×</button></div>
+  <div class="log" id="log"></div>
+  <div class="in">
+    <input id="chatIn" placeholder="和小桃聊聊天…" maxlength="60" />
+    <button id="chatSend">发送</button>
+  </div>
+</div>
+
+<script>
+/* ================= 状态与物理 ================= */
+const pet = document.getElementById('pet');
+const shadow = document.getElementById('shadow');
+const speech = document.getElementById('speech');
+const chat = document.getElementById('chat');
+const log = document.getElementById('log');
+const chatIn = document.getElementById('chatIn');
+
+let x = 200;              // 水平中心（px）
+let h = 0;                // 离地高度（px）
+let vy = 0;               // 垂直速度
+const G = 0.5;            // 重力
+let state = 'idle';       // idle | walk | grab | fall
+let dir = 1, speed = 1.1, walkUntil = 0, idleUntil = 0;
+let bubbleMode = 'none';  // none | speech | chat
+let lastActive = Date.now();
+let sleep = false;
+const MARGIN = 70;
+
+const floorH = () => window.innerHeight - 24;   // 站立时 body 底部的 y
+const clampX = v => Math.max(MARGIN, Math.min(window.innerWidth - MARGIN, v));
+
+function render() {
+  pet.style.left = (x - 65) + 'px';
+  pet.style.bottom = (16 + h) + 'px';
+  // 阴影随高度缩放
+  const k = Math.max(.35, 1 - h / 320);
+  shadow.style.left = (x - 45 * k) + 'px';
+  shadow.style.transform = `scaleX(${k})`;
+  shadow.style.opacity = .3 + k * .7;
+}
+
+/* 主循环：走动 + 重力 */
+let prev = performance.now();
+function loop(now) {
+  const dt = Math.min(32, now - prev); prev = now;
+  if (!sleep && state === 'walk' && now > walkUntil) { state = 'idle'; pet.classList.remove('walking'); idleUntil = now + 1800 + Math.random() * 4200; }
+  if (!sleep && state === 'idle' && now > idleUntil) startWalk();
+  if (state === 'walk') {
+    x = clampX(x + dir * speed * dt / 16);
+    if (x <= MARGIN + 1 || x >= window.innerWidth - MARGIN - 1) dir *= -1, flip();
+  }
+  if (state === 'fall') {
+    vy += G * dt / 16; h -= vy * dt / 16;
+    if (h <= 0) {
+      h = 0; vy = 0; state = 'idle';
+      pet.classList.remove('grabbed');
+      pet.classList.add('squash');
+      setTimeout(() => pet.classList.remove('squash'), 480);
+      pet.classList.remove('walking');
+      idleUntil = now + 1500;
+      if (bubbleMode === 'speech') hideSpeech();
+    }
+  }
+  // 打瞌睡检测
+  if (!sleep && state === 'idle' && now - lastActive > 45000) setSleep(true);
+  render();
+  requestAnimationFrame(loop);
+}
+
+function startWalk() {
+  if (sleep) return;
+  state = 'walk';
+  dir = Math.random() < .5 ? -1 : 1;
+  walkUntil = performance.now() + 1500 + Math.random() * 3800;
+  pet.classList.add('walking');
+  flip();
+}
+function flip() { pet.classList.toggle('flipped', dir < 0); }
+function setSleep(v) {
+  sleep = v; pet.classList.toggle('sleep', v);
+  if (v && state !== 'idle') { state = 'idle'; pet.classList.remove('walking'); }
+  if (v) say(pick(SLEEP_LINES), 3600);
+  else { lastActive = Date.now(); idleUntil = performance.now() + 800; }
+}
+
+/* ================= 交互：拖拽 / 点击 ================= */
+let downX = 0, downY = 0, downT = 0, dragging = false, moved = 0;
+
+pet.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  pet.setPointerCapture(e.pointerId);
+  downX = e.clientX; downY = e.clientY; downT = Date.now(); moved = 0; dragging = true;
+  lastActive = Date.now();
+});
+pet.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  moved += Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY);
+  if (moved > 8 && state !== 'grab' && state !== 'fall') {
+    state = 'grab'; pet.classList.add('grabbed');
+    pet.classList.remove('walking'); hideSpeech();
+    setSleep(false);
+  }
+  if (state === 'grab') {
+    x = clampX(e.clientX);
+    h = Math.max(0, floorH() - 26 - e.clientY);
+    lastActive = Date.now();
+  }
+});
+pet.addEventListener('pointerup', e => {
+  dragging = false;
+  if (state === 'grab') { state = 'fall'; vy = 0; return; }
+  const dt = Date.now() - downT;
+  if (moved <= 8 && dt < 500) handleClick();
+});
+
+/* 单击 = 聊天 / 双击 = 摸摸头 */
+let tapTimer = null;
+function handleClick() {
+  lastActive = Date.now();
+  if (sleep) { setSleep(false); return; }
+  if (tapTimer) {         // 双击
+    clearTimeout(tapTimer); tapTimer = null;
+    hearts(); pet.classList.remove('happy'); void pet.offsetWidth; pet.classList.add('happy');
+    if (bubbleMode === 'speech') hideSpeech();
+    say(pick(PAT_LINES), 2600);
+  } else {
+    tapTimer = setTimeout(() => { tapTimer = null; toggleChat(); }, 260);
+  }
+}
+
+function hearts() {
+  for (let i = 0; i < 6; i++) {
+    const s = document.createElement('span');
+    s.className = 'heart'; s.textContent = pick(['💗', '💕', '✨']);
+    s.style.left = (x - 30 + Math.random() * 60) + 'px';
+    s.style.top = (window.innerHeight - 150 - h + Math.random() * 30) + 'px';
+    s.style.animationDelay = (i * 70) + 'ms';
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 1300);
+  }
+}
+
+/* ================= 气泡与聊天 ================= */
+function say(text, ms = 3800) {
+  bubbleMode = 'speech';
+  speech.textContent = text;
+  speech.classList.add('show');
+  positionBubble();
+  clearTimeout(speech._t);
+  speech._t = setTimeout(hideSpeech, ms);
+}
+function hideSpeech() {
+  speech.classList.remove('show');
+  if (bubbleMode === 'speech') bubbleMode = 'none';
+}
+function positionBubble() {
+  const top = window.innerHeight - 190 - h;
+  speech.style.left = Math.min(x + 40, window.innerWidth - 320) + 'px';
+  speech.style.top = Math.max(20, top) + 'px';
+}
+function positionChat() {
+  chat.style.left = Math.min(Math.max(12, x - 150), window.innerWidth - 312) + 'px';
+  chat.style.top = Math.max(16, window.innerHeight - 420 - h) + 'px';
+}
+
+function addMsg(text, who) {
+  const d = document.createElement('div');
+  d.className = 'm ' + who; d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+function petReply(text) {           // 打字机
+  const d = addMsg('', 'pet'); pet.classList.add('talk');
+  let i = 0;
+  const t = setInterval(() => {
+    d.textContent = text.slice(0, ++i);
+    log.scrollTop = log.scrollHeight;
+    if (i >= text.length) { clearInterval(t); pet.classList.remove('talk'); }
+  }, 28);
+}
+
+function toggleChat() {
+  if (bubbleMode === 'chat') { chat.classList.remove('show'); bubbleMode = 'none'; return; }
+  hideSpeech();
+  bubbleMode = 'chat';
+  positionChat();
+  chat.classList.add('show');
+  if (!log.children.length) petReply(greetingLine());
+  chatIn.focus();
+}
+document.getElementById('chatClose').onclick = () => { chat.classList.remove('show'); bubbleMode = 'none'; };
+document.getElementById('chatSend').onclick = sendChat;
+chatIn.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+
+function sendChat() {
+  const q = chatIn.value.trim();
+  if (!q) return;
+  chatIn.value = '';
+  addMsg(q, 'me');
+  lastActive = Date.now();
+
+  // 带最近几轮上下文（去掉刚 push 的这条 user 消息，避免重复）
+  const his = [...log.querySelectorAll('.m')].slice(-9, -1).map(el => ({
+    role: el.classList.contains('me') ? 'user' : 'assistant',
+    content: el.textContent
+  }));
+
+  pet.classList.add('talk');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+
+  fetch(API_BASE + '/api/pet/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: q, history: his }),
+    signal: ctrl.signal
+  })
+    .then(r => {
+      clearTimeout(timer);
+      if (r.status === 503)
+        return '主人还没配 API Key 呀～去 UniGrow 应用页面右上角点「API Key」就能设置啦！\n' + localReply(q);
+      if (!r.ok) throw new Error('bad status');
+      return r.json().then(d => d.reply || localReply(q));
+    })
+    .catch(() => localReply(q))          // 后端未启动 / 断网 → 罐头模式
+    .then(text => {
+      pet.classList.remove('talk');
+      petReply(text);
+    });
+}
+
+/* ================= 台词库 ================= */
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+/* 后端 AI：file:// 直连本地服务；Vite/服务器下走同源代理 */
+const API_BASE = location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+
+function greetingLine() {
+  const hh = new Date().getHours();
+  if (hh < 6) return '这么晚还没睡呀？早点休息，明天才有力气成长～';
+  if (hh < 11) return '早上好！新的一天，和小桃一起加油吧！';
+  if (hh < 14) return '午安～吃饱了吗？午休一会儿效率更高哦。';
+  if (hh < 18) return '下午好！学累了吗？记得起来走走～';
+  if (hh < 23) return '晚上好！今天有什么想和我聊的吗？';
+  return '夜深啦，聊完记得早点睡哦～';
+}
+const SLEEP_LINES = ['Zzz…（小桃打起了瞌睡）', '呼…呼…（戳一下唤醒我）'];
+const PAT_LINES = ['嘿嘿，好痒呀～', '再摸摸头就更聪明啦！', '开心！今天的动力 +1', '蹭蹭你 ~'];
+const IDLE_CHATTER = [
+  '你知道吗？一句话就能让五位 Agent 同时开工！',
+  '图书馆新到了一批书，要不要去逛逛？',
+  '记得多喝水，久坐要起来伸个懒腰～',
+  '今天的你也很棒哦！',
+  '悄悄说：双击我可以摸摸头。',
+  '学不进去的时候，试试番茄钟：25 分钟就好。'
+];
+setInterval(() => {
+  if (bubbleMode === 'none' && state === 'idle' && !sleep && Math.random() < .5) say(pick(IDLE_CHATTER));
+}, 30000);
+
+function localReply(q) {
+  const t = q.toLowerCase();
+  const hh = new Date().getHours();
+  if (/你好|hi|hello|嗨|哈喽/.test(t)) return pick(['你好呀！我是小桃 🍑', '嗨～今天心情怎么样？', '哈喽！来找我是要聊天还是干活？']);
+  if (/你是谁|名字|你叫/.test(t)) return '我是小桃，UniGrow 的桌面小伙伴 🍑 上面那五位 Agent（学习/科研/竞赛/求职/校园）都是我的兄弟姐妹！';
+  if (/时间|几点/.test(t)) return '现在是 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false }) + ' ，时间过得飞快呀！';
+  if (/日期|几号|星期/.test(t)) return '今天是 ' + new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }) + '。';
+  if (/学习|复习|考试|课件/.test(t)) return '学习上的事可以找学习 Agent！在 UniGrow 里点「学习」卡片，课件考点一网打尽～';
+  if (/科研|论文|文献/.test(t)) return '论文解读找科研 Agent！创新点、方法、实验设计都能帮你拆解 📄';
+  if (/竞赛|比赛|ican|挑战杯/.test(t)) return '竞赛 Agent 擅长做规划：赛题分析、技术路线、时间线全都能安排！';
+  if (/求职|简历|面试|秋招/.test(t)) return '求职 Agent 帮你逐句打磨简历，还能模拟面试哦 💼';
+  if (/校园|图书馆|社团|自习/.test(t)) return '校园生活问校园 Agent 就好！图书馆、教务、活动它都门儿清 🏫';
+  if (/加油|鼓励|emo|难过|累|压力/.test(t)) return pick(['抱抱你！已经很努力了，休息一下再出发 💪', '每一小步都算数，小桃陪你慢慢来 🍑', '深呼吸～你可以的！']);
+  if (/笑话|讲个/.test(t)) return pick(['为什么程序员分不清万圣节和圣诞节？因为 Oct 31 == Dec 25 🎃', '我给你讲个故事：从前有只桃子，它每天都在成长，后来它变成了…会成长的 AI 🍑', '面试官：你最大的缺点是什么？我：诚实。面试官：我不觉得这是缺点。我：我不在乎你怎么觉得。']);
+  if (/天气/.test(t)) return '看看窗外呀！好天气就出门走走，坏天气就来看书，都是好日子 ☀️🌧';
+  if (/再见|拜拜|晚安/.test(t)) return pick(['拜拜～随时回来找我玩！', hh >= 21 ? '晚安，好梦！' : '回见啦！']);
+  if (/谢谢|感谢/.test(t)) return '不客气！能帮到你我就开心啦 ✨';
+  if (/走|动一动|跳/.test(t)) { setTimeout(startWalk, 600); return '好嘞，看我的遛弯步伐！'; }
+  if (/吃|饭/.test(t)) return '说到吃的我就来了！不过记得按时吃饭，身体是成长的本钱呀 🍚';
+  return pick(['嗯嗯，我在听～再多说一点？', '这个话题有意思！不过我只是一只小桃子，更深的问题交给主 Agent 吧 🧭', '收到！要不去 UniGrow 里问问专业 Agent？', '嘿嘿，虽然不太懂，但我觉得你说得对！']);
+}
+
+/* ================= 启动 ================= */
+window.addEventListener('resize', () => { x = clampX(x); render(); positionChat(); });
+window.addEventListener('pointerdown', () => { lastActive = Date.now(); if (sleep) setSleep(false); }, { capture: true });
+
+render();
+setTimeout(() => say('嗨，我是小桃 🍑 拖我起来逛逛，或点我聊天！', 4200), 900);
+setTimeout(startWalk, 2600);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
