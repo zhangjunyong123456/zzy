@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.agents.demo import stream_demo
+from app.agents.llm import set_user_llm
 from app.agents.profile import build_profile_text
 from app.agents.supervisor import stream_chat
-from app.api.deps import get_current_user_optional
+from app.api.deps import get_current_user_optional, get_user_llm
 from app.config import settings
 from app.schemas import ChatRequest
 from app.services import attachment_service, memory_service, session_service
@@ -19,9 +20,20 @@ router = APIRouter(tags=["chat"])
 
 @router.post("/chat/stream")
 async def chat_stream(
-    req: ChatRequest, user: dict | None = Depends(get_current_user_optional)
+    req: ChatRequest,
+    user: dict | None = Depends(get_current_user_optional),
+    user_llm: dict | None = Depends(get_user_llm),
 ):
     uid = user["id"] if user else None
+    # BYOK：绑定到当前请求上下文（worker / aggregator / 附件视觉均可见）
+    set_user_llm(user_llm)
+
+    # 有效 Key 判定：用户 Key 或全局 Key 任一可用
+    has_key = bool(user_llm and user_llm.get("api_key")) or settings.has_api_key
+    # BYOK 独占模式：未带用户 Key 一律走演示模式，不消耗服务端全局 Key
+    if settings.byok_only:
+        has_key = bool(user_llm and user_llm.get("api_key"))
+
     if req.session_id:
         # 归属校验：不存在或不属于当前用户（含游客）→ 404 防枚举
         row = session_service.get_session_row(req.session_id)
@@ -35,7 +47,7 @@ async def chat_stream(
         session_service.set_category_if_unset(session_id, req.category)
 
     # 演示模式：未配置 Key 也提供基础对话（规则回复）并提示接入
-    if not settings.has_api_key:
+    if not has_key:
         demo_mid = session_service.add_message(session_id, "user", None, req.message)
         session_service.set_title_if_default(session_id, req.message)
         attachment_service.bind_attachments(demo_mid, session_id, req.attachment_ids, uid)
@@ -59,6 +71,7 @@ async def chat_stream(
     memory_text = memory_service.build_memory_text(req.memory_ids, uid)
 
     async def gen():
+        set_user_llm(user_llm)  # 流式阶段重新绑定（响应体在请求后段消费，确保上下文可见）
         yield f"data: {__import__('json').dumps({'session_id': session_id}, ensure_ascii=False)}\n\n"
         try:
             async for event in stream_chat(

@@ -1,12 +1,13 @@
-"""系统接口：健康检查 + 配置状态 + 多供应商 API Key 在线配置。"""
+"""系统接口：健康检查 + 配置状态 + 多供应商 API Key 在线配置 + 用户 Key 校验。"""
 import re
 from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
 
-from app.agents.llm import PROVIDERS, active_provider, get_llm, get_vision_llm
+from app.agents.llm import PROVIDERS, active_provider
 from app.config import settings
 
 router = APIRouter(tags=["system"])
@@ -84,8 +85,6 @@ async def set_provider(req: ProviderRequest) -> dict:
         )
     _upsert_env("LLM_PROVIDER", provider)
     settings.llm_provider = provider
-    get_llm.cache_clear()
-    get_vision_llm.cache_clear()
     return {"ok": True, "provider": provider, "model": getattr(settings, f"{provider}_model")}
 
 
@@ -100,8 +99,6 @@ async def set_model(req: ModelRequest) -> dict:
         return JSONResponse(status_code=400, content={"detail": "模型名不能为空"})
     _upsert_env(f"{provider.upper()}_MODEL", model)
     setattr(settings, f"{provider}_model", model)
-    get_llm.cache_clear()
-    get_vision_llm.cache_clear()
     return {"ok": True, "provider": provider, "model": model}
 
 
@@ -124,9 +121,41 @@ async def set_api_key(req: ApiKeyRequest) -> dict:
 
     _upsert_env(f"{provider.upper()}_API_KEY", key)
     _upsert_env("LLM_PROVIDER", provider)
-    # 热更新运行时单例 + 清空 LLM 缓存，立即生效无需重启
+    # 热更新运行时单例，立即生效无需重启
     setattr(settings, f"{provider}_api_key", key)
     settings.llm_provider = provider
-    get_llm.cache_clear()
-    get_vision_llm.cache_clear()
     return {"ok": True, "api_key_configured": True, "provider": provider}
+
+
+# ---------- 用户 Key 在线校验 ----------
+
+class VerifyKeyRequest(BaseModel):
+    provider: str
+    api_key: str = Field(min_length=6, max_length=160)
+    model: str = Field(default="", max_length=80)
+
+
+@router.post("/config/verify-key")
+async def verify_user_key(req: VerifyKeyRequest) -> dict:
+    """在线校验用户自带的 Key 是否可用（发一次极简请求探测）。"""
+    provider = req.provider if req.provider in PROVIDERS else "deepseek"
+    key = req.api_key.strip()
+    if not key:
+        return JSONResponse(status_code=400, content={"detail": "API Key 不能为空"})
+
+    base_url = getattr(settings, f"{provider}_base_url")
+    model = req.model.strip() or getattr(settings, f"{provider}_model")
+    try:
+        llm = ChatOpenAI(api_key=key, base_url=base_url, model=model, temperature=0)
+        await llm.ainvoke("Hi")
+        return {"ok": True, "provider": provider, "model": model}
+    except Exception as e:
+        msg = str(e)
+        if "401" in msg or "api key" in msg.lower():
+            detail = "Key 无效或已过期，请检查后重试"
+        elif "429" in msg or "rate" in msg.lower():
+            detail = "Key 有效但触发了限流，暂时可用"
+            return {"ok": True, "provider": provider, "model": model, "warning": detail}
+        else:
+            detail = f"校验失败：{msg[:200]}"
+        return JSONResponse(status_code=400, content={"detail": detail})

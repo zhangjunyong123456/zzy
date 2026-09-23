@@ -14,6 +14,12 @@ _tmp = tempfile.mkdtemp(prefix="unigrow_test_")
 os.environ["SQLITE_PATH"] = os.path.join(_tmp, "test.db")
 os.environ["CHROMA_PERSIST_DIR"] = os.path.join(_tmp, "chroma")
 os.environ["UPLOAD_DIR"] = os.path.join(_tmp, "uploads")
+# 强制本地 SQLite：防止 .env 里配置的 TURSO_DATABASE_URL 让测试误连云库
+os.environ["TURSO_DATABASE_URL"] = ""
+os.environ["TURSO_AUTH_TOKEN"] = ""
+# 测试固定非独占模式：防止 .env 里 BYOK_ONLY=1 把所有不带用户 Key 的测试打进演示模式
+# （BYOK 独占行为由 test_byok.py 的用例自行 monkeypatch 验证）
+os.environ["BYOK_ONLY"] = "0"
 os.environ.setdefault("SECRET_KEY", "test-secret")  # 在 import app 之前，避免测试写真实 secret.key
 
 import pytest  # noqa: E402

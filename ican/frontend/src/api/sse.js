@@ -1,4 +1,5 @@
 import { api, getToken } from './client'
+import { llmHeaders } from '../utils/llmStorage'
 
 /**
  * fetch 流式读取 SSE（POST + JSON body）。
@@ -10,7 +11,8 @@ export async function streamSSE({ url, body, onEvent, signal }) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...llmHeaders()
     },
     body: JSON.stringify(body),
     signal

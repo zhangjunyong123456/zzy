@@ -119,12 +119,16 @@ def _extract_doc(path: Path, ext: str) -> str:
 
 
 async def extract_image(path: Path, mime: str) -> str:
-    """视觉模型提取图片内容；未配智谱 Key 或调用失败返回空串。"""
-    if not settings.zhipu_api_key.strip():
+    """视觉模型提取图片内容；无可用 Key（用户/全局）或调用失败返回空串。
+
+    Key 选择逻辑在 get_vision_llm 内：用户智谱 Key → 全局 Key（仅非独占模式）→ None 跳过。
+    """
+    from app.agents.llm import get_vision_llm
+
+    llm = get_vision_llm()
+    if llm is None:
         return ""
     from langchain_core.messages import HumanMessage
-
-    from app.agents.llm import get_vision_llm
 
     b64 = base64.b64encode(path.read_bytes()).decode()
     msg = HumanMessage(
@@ -137,7 +141,7 @@ async def extract_image(path: Path, mime: str) -> str:
         ]
     )
     try:
-        resp = await get_vision_llm().ainvoke([msg])
+        resp = await llm.ainvoke([msg])
         text = resp.content if isinstance(resp.content, str) else ""
     except Exception as e:
         logger.warning("视觉模型提取图片失败: %s", e)

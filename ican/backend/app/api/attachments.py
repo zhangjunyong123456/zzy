@@ -6,7 +6,8 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.api.deps import get_current_user_optional
+from app.api.deps import get_current_user_optional, get_user_llm
+from app.agents.llm import set_user_llm
 from app.config import settings
 from app.services import attachment_service, session_service
 
@@ -19,8 +20,10 @@ async def upload_attachment(
     file: UploadFile = File(...),
     session_id: str | None = Form(None),
     user: dict | None = Depends(get_current_user_optional),
+    user_llm: dict | None = Depends(get_user_llm),
 ) -> dict:
     uid = user["id"] if user else None
+    set_user_llm(user_llm)  # BYOK：视觉模型优先用用户的智谱 Key
     if session_id:
         row = session_service.get_session_row(session_id)
         if row is None or (row["user_id"] or None) != uid:
@@ -49,7 +52,10 @@ async def upload_attachment(
     extracted = await attachment_service.extract_text(path, ext, mime, kind)
     warning = None
     if kind == "image" and not extracted:
-        if not settings.zhipu_api_key.strip():
+        user_zhipu = bool(user_llm and user_llm.get("api_key") and user_llm.get("provider") == "zhipu")
+        if settings.byok_only:
+            warning = "图片识图需配置你自己的智谱 API Key（个人中心 → 模型服务），已保存图片但暂不参与回答"
+        elif not user_zhipu and not settings.zhipu_api_key.strip():
             warning = "图片解析需配置智谱 API Key（个人中心 → 模型服务），已保存图片但暂不参与回答"
         else:
             warning = "图片内容解析失败，本次回答暂不使用图片内容"

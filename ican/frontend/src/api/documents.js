@@ -31,18 +31,7 @@ export function deleteSession(id) {
   return api.delete(`/sessions/${id}`).then((r) => r.data)
 }
 
-export function configStatus() {
-  return api.get('/config/status').then((r) => r.data)
-}
-
-export function saveApiKey(provider, apiKey) {
-  return api.post('/config/api-key', { provider, api_key: apiKey }).then((r) => r.data)
-}
-
-export function setProvider(provider) {
-  return api.post('/config/provider', { provider }).then((r) => r.data)
-}
-
-export function setModel(provider, model) {
-  return api.post('/config/model', { provider, model }).then((r) => r.data)
+/** 在线校验用户自带的模型 Key 是否可用 */
+export function verifyKey(provider, apiKey, model = '') {
+  return api.post('/config/verify-key', { provider, api_key: apiKey, model }).then((r) => r.data)
 }

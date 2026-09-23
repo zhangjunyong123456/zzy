@@ -40,6 +40,15 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    # Turso 云数据库（可选）：配置后 get_conn() 走云库，账号/会话/消息跨重启持久；
+    # 留空则用本地 SQLite 文件（本地开发/测试）。环境变量 TURSO_DATABASE_URL / TURSO_AUTH_TOKEN
+    turso_database_url: str = ""
+    turso_auth_token: str = ""
+
+    # BYOK 独占模式（线上部署开启）：用户必须自带 Key（X-LLM-* 请求头），
+    # 全局 .env 的 Key 不再用于用户对话，未带 Key 一律走演示模式
+    byok_only: bool = False
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )

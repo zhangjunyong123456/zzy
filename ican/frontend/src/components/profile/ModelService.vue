@@ -1,15 +1,15 @@
 <template>
   <div class="ms-wrap">
     <!-- 总状态条 -->
-    <div class="ms-status" :class="{ ok: !!status?.api_key_configured }">
+    <div class="ms-status" :class="{ ok: !!activeCard }">
       <span class="dot"></span>
       <span class="st-text">
-        <template v-if="status?.api_key_configured">
-          服务就绪 · 当前 {{ activeCard?.label }} / {{ status?.model }}
+        <template v-if="activeCard">
+          已使用你自己的 Key · {{ activeCard.meta.label }} / {{ activeCard.model }}
         </template>
-        <template v-else>未配置 API Key · 当前为演示模式（规则回复）</template>
+        <template v-else>未配置 Key · 当前为演示模式（规则回复）</template>
       </span>
-      <span class="st-hint">Key 仅保存在本机 backend/.env，保存后立即生效、无需重启</span>
+      <span class="st-hint">Key 仅保存在你的浏览器本地，不会上传服务器存储；对话时直接透传给模型厂商</span>
     </div>
 
     <!-- 三张供应商卡片 -->
@@ -17,8 +17,8 @@
       <div class="ms-head">
         <span class="ms-name">{{ c.label }}</span>
         <span class="ms-model">{{ c.model }}</span>
-        <el-tag v-if="c.active" type="success" effect="dark" size="small" round>✓ 当前使用</el-tag>
-        <el-tag v-else-if="c.configured" type="info" effect="plain" size="small" round>已配置</el-tag>
+        <el-tag v-if="c.active" type="success" effect="dark" size="small" round>✓ 使用中</el-tag>
+        <el-tag v-else-if="c.configured" type="info" effect="plain" size="small" round>已保存</el-tag>
         <el-tag v-else type="warning" effect="plain" size="small" round>未配置</el-tag>
         <el-button
           v-if="!c.active"
@@ -29,7 +29,7 @@
           :disabled="!c.configured || switching"
           @click="use(c.value)"
         >
-          设为当前
+          启用
         </el-button>
       </div>
 
@@ -49,18 +49,18 @@
               @keydown.enter="saveKey(c)"
             />
             <el-button type="primary" :loading="c.saving" :disabled="!c.keyDraft.trim()" @click="saveKey(c)">
-              {{ c.configured ? '更新' : '保存' }}
+              保存{{ c.configured ? '' : '并启用' }}
             </el-button>
           </div>
           <p v-if="c.note" class="ms-note">{{ c.note }}</p>
         </div>
         <div class="ms-field">
-          <label>默认模型</label>
+          <label>模型名（可选，留空用默认）</label>
           <div class="ms-inline">
-            <el-input v-model="c.modelDraft" @keydown.enter="saveModel(c)" />
+            <el-input v-model="c.modelDraft" :placeholder="c.defaultModel" @keydown.enter="saveModel(c)" />
             <el-button
               :loading="c.savingModel"
-              :disabled="!c.modelDraft.trim() || c.modelDraft.trim() === c.model"
+              :disabled="c.savingModel || c.modelDraft.trim() === getModel(c.value)"
               @click="saveModel(c)"
             >
               保存
@@ -69,7 +69,7 @@
         </div>
         <div class="ms-field">
           <label>API 地址</label>
-          <span class="ms-url">{{ c.base_url }}</span>
+          <span class="ms-url">{{ c.base }}</span>
         </div>
       </div>
     </div>
@@ -79,75 +79,54 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { configStatus, saveApiKey } from '../../api/documents'
-import { useChatStore } from '../../stores/chat'
-
-const store = useChatStore()
-const status = ref(null)
-const switching = ref(false)
-
-/** 供应商静态信息（链接/占位符等），动态字段由 /config/status 填充 */
-const META = [
-  {
-    value: 'deepseek',
-    label: 'DeepSeek',
-    placeholder: 'sk-...',
-    link: 'https://platform.deepseek.com',
-    linkText: 'platform.deepseek.com',
-    note: ''
-  },
-  {
-    value: 'siliconflow',
-    label: '硅基流动 SiliconFlow',
-    placeholder: 'sk-...',
-    link: 'https://cloud.siliconflow.cn/account/ak',
-    linkText: 'cloud.siliconflow.cn',
-    note: '价格见 siliconflow.com/pricing，另有 GLM / Kimi / Qwen 百余模型可选'
-  },
-  {
-    value: 'zhipu',
-    label: '智谱 GLM',
-    placeholder: '形如 id.secret（中间有个点）',
-    link: 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
-    linkText: 'bigmodel.cn',
-    note: 'glm-4.5-flash 免费；旗舰 glm-5.3 直接改上方模型名即可'
-  }
-]
+import { verifyKey } from '../../api/documents'
+import {
+  PROVIDER_META,
+  PROVIDER_ORDER,
+  getActive,
+  getModel,
+  getKey,
+  saveKey as persistKey,
+  saveModel as persistModel,
+  setActive
+} from '../../utils/llmStorage'
 
 const cards = reactive([])
+const switching = ref(false)
 const activeCard = computed(() => cards.find((c) => c.active))
 
-async function load() {
-  const s = await configStatus().catch(() => null)
-  if (!s) return
-  status.value = s
-  for (const meta of META) {
-    const info = s.providers?.[meta.value] || {}
-    let card = cards.find((c) => c.value === meta.value)
-    if (!card) {
-      card = reactive({ ...meta, keyDraft: '', modelDraft: '', saving: false, savingModel: false })
-      cards.push(card)
-    }
-    card.configured = !!info.configured
-    card.active = !!info.active
-    card.model = info.model || ''
-    card.base_url = info.base_url || ''
-    card.modelDraft = card.model
-  }
+for (const value of PROVIDER_ORDER) {
+  const meta = PROVIDER_META[value]
+  cards.push(
+    reactive({
+      value,
+      ...meta,
+      configured: !!getKey(value),
+      active: getActive() === value && !!getKey(value),
+      model: getModel(value),
+      defaultModel: meta.model,
+      keyDraft: '',
+      modelDraft: getModel(value),
+      saving: false,
+      savingModel: false
+    })
+  )
 }
 
+/** 保存并在线校验 Key；校验通过自动启用 */
 async function saveKey(c) {
   const k = c.keyDraft.trim()
   if (!k || c.saving) return
   c.saving = true
   try {
-    await saveApiKey(c.value, k)
+    await verifyKey(c.value, k, c.modelDraft.trim())
+    persistKey(c.value, k)
+    setActive(c.value)
     c.keyDraft = ''
-    ElMessage.success(`${c.label} API Key 已保存并生效`)
-    await load()
-    store.loadConfigStatus()
+    refresh()
+    ElMessage.success(`${c.label} Key 校验通过，已保存并启用`)
   } catch (e) {
-    ElMessage.error(e?.detail || e?.message || '保存失败，请重试')
+    ElMessage.error(e?.detail || e?.message || 'Key 校验未通过，请检查后重试')
   } finally {
     c.saving = false
   }
@@ -155,15 +134,12 @@ async function saveKey(c) {
 
 async function saveModel(c) {
   const m = c.modelDraft.trim()
-  if (!m || m === c.model || c.savingModel) return
+  if (c.savingModel || m === getModel(c.value)) return
   c.savingModel = true
   try {
-    await store.saveModel(c.value, m)
-    ElMessage.success(`模型已切换为 ${m}`)
-    await load()
-    store.loadConfigStatus()
-  } catch (e) {
-    ElMessage.error(e?.detail || e?.message || '保存失败，请重试')
+    persistModel(c.value, m)
+    refresh()
+    ElMessage.success(m ? `模型已切换为 ${m}` : '已恢复默认模型')
   } finally {
     c.savingModel = false
   }
@@ -173,18 +149,25 @@ async function use(provider) {
   if (switching.value) return
   switching.value = true
   try {
-    const s = await store.switchProvider(provider)
-    ElMessage.success(`已切换到 ${s.provider === 'zhipu' ? '智谱' : s.provider === 'siliconflow' ? '硅基流动' : 'DeepSeek'} · ${s.model}`)
-    await load()
-    store.loadConfigStatus()
-  } catch (e) {
-    ElMessage.error(e?.detail || e?.message || '切换失败')
+    setActive(provider)
+    refresh()
+    const c = cards.find((x) => x.value === provider)
+    ElMessage.success(`已启用 ${c?.label} · ${getModel(provider)}`)
   } finally {
     switching.value = false
   }
 }
 
-onMounted(load)
+function refresh() {
+  for (const c of cards) {
+    c.configured = !!getKey(c.value)
+    c.active = getActive() === c.value && !!getKey(c.value)
+    c.model = getModel(c.value)
+    c.modelDraft = getModel(c.value)
+  }
+}
+
+onMounted(refresh)
 </script>
 
 <style scoped>

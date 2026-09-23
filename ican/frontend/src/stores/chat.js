@@ -1,16 +1,18 @@
 import { defineStore } from 'pinia'
 import { sendMessage } from '../api/chat'
 import { uploadAttachment } from '../api/attachment'
+import { listSessions, createSession, getSession, deleteSession } from '../api/documents'
 import {
-  listSessions,
-  createSession,
-  getSession,
-  deleteSession,
-  configStatus,
-  saveApiKey as saveApiKeyApi,
-  setProvider,
-  setModel
-} from '../api/documents'
+  PROVIDER_META,
+  PROVIDER_ORDER,
+  getActive,
+  getKey,
+  getModel,
+  isConfigured,
+  saveKey as persistKey,
+  saveModel as persistModel,
+  setActive as persistActive
+} from '../utils/llmStorage'
 import { listMemories, deleteMemory as deleteMemoryApi } from '../api/memory'
 import { ApiError } from '../api/client'
 
@@ -58,29 +60,37 @@ export const useChatStore = defineStore('chat', {
       this.sessions = await listSessions()
     },
     async loadConfigStatus() {
-      try {
-        const s = await configStatus()
-        this.configOk = !!s.api_key_configured
-        this.activeProvider = s.provider || null
-        this.providerInfo = s.providers || {}
-      } catch {
-        this.configOk = false
-      }
+      // BYOK：配置存于浏览器本地，无需请求服务端
+      const active = getActive()
+      this.configOk = isConfigured()
+      this.activeProvider = this.configOk ? active : null
+      this.providerInfo = Object.fromEntries(
+        PROVIDER_ORDER.map((p) => [
+          p,
+          {
+            configured: !!getKey(p),
+            active: this.configOk && p === active,
+            model: getModel(p),
+            label: PROVIDER_META[p]?.label || p
+          }
+        ])
+      )
     },
+    /** 保存某供应商的 Key 到浏览器本地（不自动启用，由 ModelService 控制启用） */
     async saveApiKey(provider, key) {
-      const s = await saveApiKeyApi(provider, key)
-      this.configOk = !!s.api_key_configured
-      this.activeProvider = s.provider || provider
+      persistKey(provider, key)
+      this.loadConfigStatus()
     },
-    /** 切换当前生效供应商（须已配置该家 Key） */
+    /** 切换当前使用的供应商（须已保存该家 Key） */
     async switchProvider(provider) {
-      const s = await setProvider(provider)
-      this.activeProvider = s.provider
-      return s
+      persistActive(provider)
+      this.loadConfigStatus()
+      return { provider, model: getModel(provider) }
     },
-    /** 修改某供应商默认模型名 */
+    /** 修改某供应商模型名 */
     async saveModel(provider, model) {
-      return await setModel(provider, model)
+      persistModel(provider, model)
+      this.loadConfigStatus()
     },
 
     /* ---------- 记忆 ---------- */
@@ -341,7 +351,7 @@ export const useChatStore = defineStore('chat', {
           this.configOk = false
           this.messages.push({
             kind: 'error',
-            text: '后端未配置 DeepSeek API Key：请编辑 backend/.env 填入 DEEPSEEK_API_KEY 后重启后端服务。'
+            text: '未检测到你的模型 API Key：请到 个人中心 → 模型服务 配置你自己的 Key 后再试。'
           })
         } else {
           this.messages.push({ kind: 'error', text: e.message || '连接中断' })

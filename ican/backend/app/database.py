@@ -4,6 +4,9 @@ from pathlib import Path
 
 from app.config import settings
 
+# Turso 共享连接（无状态、线程安全，进程内只建一次）
+_turso_conn = None
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -67,10 +70,25 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_memories_user ON memories(user_id);
+CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL             -- 简单 KV：目前存 secret_key（云库模式下密钥跨重启持久）
+);
 """
 
 
-def get_conn() -> sqlite3.Connection:
+def get_conn():
+    """配置了 TURSO_DATABASE_URL 时返回云库连接（共享无状态实例，线程安全）；
+    否则返回本地 SQLite 文件连接（WAL 模式，每调用开独立连接）。"""
+    if settings.turso_database_url:
+        global _turso_conn
+        if _turso_conn is None:
+            from app.turso_client import connect
+
+            _turso_conn = connect(
+                settings.turso_database_url, settings.turso_auth_token
+            )
+        return _turso_conn
     path = Path(settings.sqlite_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), timeout=10)

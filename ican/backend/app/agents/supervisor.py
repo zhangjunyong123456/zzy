@@ -180,7 +180,7 @@ def _err_msg(e: Exception) -> str:
     if "429" in text or "rate" in text.lower():
         return "模型服务限流（429），请稍后重试"
     if "401" in text or "api key" in text.lower():
-        return "API Key 无效或未配置"
+        return "API Key 无效或未配置：请到 个人中心 → 模型服务 检查你自己的 Key"
     return text[:200] or "服务内部错误"
 
 

@@ -28,12 +28,47 @@ def verify_password(password: str, stored: str) -> bool:
 
 
 def _load_secret() -> bytes:
+    """密钥来源优先级：SECRET_KEY 环境变量 > 云库 app_meta（Turso 模式，跨重启持久）> 本地文件。
+    结果进程内缓存，避免每请求读文件/查库。"""
+    global _secret_cache
+    if _secret_cache is not None:
+        return _secret_cache
     if settings.secret_key.strip():
-        return settings.secret_key.strip().encode()
-    path = Path(settings.secret_file)
-    if path.exists():
-        return path.read_bytes().strip() or _generate_secret(path)
-    return _generate_secret(path)
+        _secret_cache = settings.secret_key.strip().encode()
+    elif settings.turso_database_url:
+        _secret_cache = _db_secret()
+    else:
+        path = Path(settings.secret_file)
+        if path.exists():
+            _secret_cache = path.read_bytes().strip() or _generate_secret(path)
+        else:
+            _secret_cache = _generate_secret(path)
+    return _secret_cache
+
+
+def _db_secret() -> bytes:
+    """云库模式下密钥存 app_meta 表：Render 重启后仍取同一密钥，token 不失效。
+    INSERT OR IGNORE + 回读：并发启动时先写入者胜，各实例取到一致密钥。"""
+    from app.database import get_conn
+
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT value FROM app_meta WHERE key = 'secret_key'"
+        ).fetchone()
+        if row and str(row["value"]).strip():
+            return str(row["value"]).strip().encode()
+        secret = secrets.token_hex(32)
+        conn.execute(
+            "INSERT OR IGNORE INTO app_meta (key, value) VALUES ('secret_key', ?)",
+            (secret,),
+        )
+        row2 = conn.execute(
+            "SELECT value FROM app_meta WHERE key = 'secret_key'"
+        ).fetchone()
+        return str(row2["value"]).strip().encode()
+
+
+_secret_cache: bytes | None = None
 
 
 def _generate_secret(path: Path) -> bytes:

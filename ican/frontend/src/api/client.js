@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { llmHeaders } from '../utils/llmStorage'
 
 export const TOKEN_KEY = 'ug_token'
 
@@ -19,6 +20,8 @@ export class ApiError extends Error {
 api.interceptors.request.use((config) => {
   const token = getToken()
   if (token) config.headers.Authorization = `Bearer ${token}`
+  // BYOK：用户自带的模型 Key 随请求头带上（后端优先使用，不消耗服务端 Key）
+  Object.assign(config.headers, llmHeaders())
   return config
 })
 
