@@ -8,7 +8,7 @@ export const PROVIDER_META = {
     label: 'DeepSeek',
     model: 'deepseek-flash',
     base: 'https://api.deepseek.com',
-    placeholder: 'sk-...',
+    placeholder: '在此粘贴你的 API Key（输入时自动遮盖）',
     link: 'https://platform.deepseek.com',
     linkText: 'platform.deepseek.com',
     note: ''
@@ -17,7 +17,7 @@ export const PROVIDER_META = {
     label: '硅基流动 SiliconFlow',
     model: 'deepseek-ai/DeepSeek-V4-Flash',
     base: 'https://api.siliconflow.cn/v1',
-    placeholder: 'sk-...',
+    placeholder: '在此粘贴你的 API Key（输入时自动遮盖）',
     link: 'https://cloud.siliconflow.cn/account/ak',
     linkText: 'cloud.siliconflow.cn',
     note: '另有 GLM / Kimi / Qwen 百余模型可选，价格见 siliconflow.com/pricing'
@@ -26,7 +26,7 @@ export const PROVIDER_META = {
     label: '智谱 GLM',
     model: 'glm-4.5-flash',
     base: 'https://open.bigmodel.cn/api/paas/v4',
-    placeholder: '形如 id.secret（中间有个点）',
+    placeholder: '在此粘贴你的 API Key（形如 id.secret）',
     link: 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
     linkText: 'bigmodel.cn',
     note: 'glm-4.5-flash 免费；旗舰 glm-5.3 直接改模型名即可'

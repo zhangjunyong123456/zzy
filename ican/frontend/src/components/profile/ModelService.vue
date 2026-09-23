@@ -55,6 +55,7 @@
               保存{{ c.configured ? '' : '并启用' }}
             </el-button>
           </div>
+          <p class="ms-note">🔒 Key 仅保存在浏览器本地并以密码态遮盖显示，不会上传服务器存储；请勿在共享屏幕或公开截图中泄露</p>
           <p v-if="c.note" class="ms-note">{{ c.note }}</p>
         </div>
         <div class="ms-field">

@@ -16,11 +16,12 @@ def get_user_stats(user: dict) -> dict:
               SUM(CASE WHEN m.role = 'user' THEN 1 ELSE 0 END) AS question_count,
               SUM(CASE WHEN m.role = 'agent' THEN 1 ELSE 0 END) AS reply_count,
               COUNT(DISTINCT CASE WHEN m.role = 'user'
+                    AND date(m.created_at, 'localtime') >= date(?)
                     THEN date(m.created_at, 'localtime') END) AS active_days
             FROM messages m JOIN sessions s ON s.id = m.session_id
             WHERE s.user_id = ?
             """,
-            (uid,),
+            (user["created_at"], uid),
         ).fetchone()
         session_count = conn.execute(
             "SELECT COUNT(*) AS c FROM sessions WHERE user_id = ?", (uid,)
@@ -41,9 +42,10 @@ def get_user_stats(user: dict) -> dict:
             FROM messages m JOIN sessions s ON s.id = m.session_id
             WHERE s.user_id = ?
               AND m.created_at >= date('now', 'localtime', '-14 days')
+              AND m.created_at >= ?
             GROUP BY date
             """,
-            (uid,),
+            (uid, user["created_at"]),
         ).fetchall()
 
     by_agent = {r["agent"]: r["count"] for r in agent_rows}
@@ -68,7 +70,7 @@ def get_user_stats(user: dict) -> dict:
             "session_count": session_count,
             "question_count": totals_row["question_count"] or 0,
             "reply_count": totals_row["reply_count"] or 0,
-            "active_days": totals_row["active_days"] or 0,
+            "active_days": min(totals_row["active_days"] or 0, days_since),
             "days_since_register": days_since,
         },
         "agent_usage": agent_usage,
