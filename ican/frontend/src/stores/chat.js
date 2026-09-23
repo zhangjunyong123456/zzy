@@ -14,7 +14,7 @@ import {
   setActive as persistActive
 } from '../utils/llmStorage'
 import { listMemories, deleteMemory as deleteMemoryApi } from '../api/memory'
-import { ApiError } from '../api/client'
+import { api, ApiError } from '../api/client'
 
 /* 当前流式请求的中断器（非序列化状态，不放 Pinia state） */
 let streamAbort = null
@@ -52,10 +52,22 @@ export const useChatStore = defineStore('chat', {
     /** @type {Array<string>} 当前启用的记忆 id（仅前端状态，随消息发送） */
     activeMemoryIds: [],
     /** @type {Array<string>} 点选待存记忆的消息 id（历史会话中点「＋」） */
-    selectedMessageIds: []
+    selectedMessageIds: [],
+    /** 每日免费额度 {limit, used, remaining}；limit=null 表示不展示（自带 Key/功能关闭） */
+    freeQuota: null
   }),
 
   actions: {
+    /** 每日免费额度：未自带 Key 的用户每日可用服务器 Key 的真 AI 次数（游客共享池） */
+    async loadFreeQuota() {
+      try {
+        const { data } = await api.get('/chat/quota')
+        this.freeQuota = data
+      } catch {
+        this.freeQuota = null
+      }
+    },
+
     async loadSessions() {
       this.sessions = await listSessions()
     },
@@ -256,6 +268,7 @@ export const useChatStore = defineStore('chat', {
         this.activeAgents = []
         this.loadSessions()
         this.attachMessageIds()
+        this.loadFreeQuota() // 发送消耗了免费额度，刷新剩余次数角标
       }
 
       streamAbort = new AbortController()

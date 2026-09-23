@@ -11,11 +11,29 @@ from app.agents.supervisor import stream_chat
 from app.api.deps import get_current_user_optional, get_user_llm
 from app.config import settings
 from app.schemas import ChatRequest
-from app.services import attachment_service, memory_service, session_service
+from app.services import attachment_service, memory_service, quota_service, session_service
 from app.sse import SSE_HEADERS
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
+
+
+@router.get("/chat/quota")
+async def chat_quota(
+    user: dict | None = Depends(get_current_user_optional),
+    user_llm: dict | None = Depends(get_user_llm),
+):
+    """当日免费额度状态（登录用户独立 / 游客共享池）。
+    limit 为 null 表示不展示额度（自带 Key / 额度功能关闭 / 独占模式）。"""
+    if (user_llm and user_llm.get("api_key")) or settings.daily_free_quota <= 0 or settings.byok_only:
+        return {"limit": None, "used": 0, "remaining": None}
+    uid = user["id"] if user else None
+    used = quota_service.get_used(uid)
+    return {
+        "limit": settings.daily_free_quota,
+        "used": used,
+        "remaining": max(0, settings.daily_free_quota - used),
+    }
 
 
 @router.post("/chat/stream")
@@ -28,11 +46,23 @@ async def chat_stream(
     # BYOK：绑定到当前请求上下文（worker / aggregator / 附件视觉均可见）
     set_user_llm(user_llm)
 
-    # 有效 Key 判定：用户 Key 或全局 Key 任一可用
-    has_key = bool(user_llm and user_llm.get("api_key")) or settings.has_api_key
-    # BYOK 独占模式：未带用户 Key 一律走演示模式，不消耗服务端全局 Key
+    # 有效 Key 判定：用户 Key 优先；无用户 Key 时走服务器 Key，受每日免费额度约束
+    user_has_key = bool(user_llm and user_llm.get("api_key"))
+    quota_exhausted = False
     if settings.byok_only:
-        has_key = bool(user_llm and user_llm.get("api_key"))
+        # 独占模式：未带用户 Key 一律演示模式，服务器 Key 不参与
+        has_key = user_has_key
+    elif user_has_key or settings.daily_free_quota <= 0:
+        # 自带 Key 不限；额度功能关闭（=0）时保持旧行为（服务器 Key 不限次）
+        has_key = user_has_key or settings.has_api_key
+    else:
+        # 无自带 Key + 额度开启：查询/占用当日额度（游客共享 'guest' 池）
+        has_key = settings.has_api_key
+        if has_key and quota_service.get_used(uid) >= settings.daily_free_quota:
+            has_key = False
+            quota_exhausted = True
+        elif has_key:
+            quota_service.consume(uid)
 
     if req.session_id:
         # 归属校验：不存在或不属于当前用户（含游客）→ 404 防枚举
@@ -52,9 +82,15 @@ async def chat_stream(
         session_service.set_title_if_default(session_id, req.message)
         attachment_service.bind_attachments(demo_mid, session_id, req.attachment_ids, uid)
 
+        exhausted_notice = (
+            f"今日免费额度已用完（每天 {settings.daily_free_quota} 次），"
+            "已切换为演示模式（规则回复）。明天自动恢复，或在「个人中心 → 模型服务」"
+            "配置你自己的 Key 即可不限次使用。"
+        ) if quota_exhausted else ""
+
         async def demo_gen():
             yield f"data: {__import__('json').dumps({'session_id': session_id}, ensure_ascii=False)}\n\n"
-            async for event in stream_demo(session_id, req.message):
+            async for event in stream_demo(session_id, req.message, notice=exhausted_notice):
                 yield event
 
         return StreamingResponse(demo_gen(), media_type="text/event-stream", headers=SSE_HEADERS)

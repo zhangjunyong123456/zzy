@@ -58,11 +58,12 @@ def _build_reply(message: str) -> tuple[str, str]:
     return "main", main_reply
 
 
-async def stream_demo(session_id: str, message: str):
-    """演示流：notice → agent_start → token* → agent_end → done，与正式流事件协议一致。"""
+async def stream_demo(session_id: str, message: str, notice: str = ""):
+    """演示流：notice → agent_start → token* → agent_end → done，与正式流事件协议一致。
+    notice 为空时用默认「未配置 Key」引导文案；额度用尽降级时传入专属提示。"""
     agent, content = _build_reply(message)
 
-    yield sse_event("notice", {"message": _NOTICE})
+    yield sse_event("notice", {"message": notice or _NOTICE})
     yield sse_event("agent_start", {"agent": agent})
 
     # 切成小块模拟流式输出

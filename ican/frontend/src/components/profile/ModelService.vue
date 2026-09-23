@@ -7,6 +7,9 @@
         <template v-if="activeCard">
           已使用你自己的 Key · {{ activeCard.meta.label }} / {{ activeCard.model }}
         </template>
+        <template v-else-if="quotaText">
+          未配置 Key · 免费体验中（{{ quotaText }}）
+        </template>
         <template v-else>未配置 Key · 当前为演示模式（规则回复）</template>
       </span>
       <span class="st-hint">Key 仅保存在你的浏览器本地，不会上传服务器存储；对话时直接透传给模型厂商</span>
@@ -80,6 +83,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { verifyKey } from '../../api/documents'
+import { useChatStore } from '../../stores/chat'
 import {
   PROVIDER_META,
   PROVIDER_ORDER,
@@ -91,9 +95,15 @@ import {
   setActive
 } from '../../utils/llmStorage'
 
+const chatStore = useChatStore()
 const cards = reactive([])
 const switching = ref(false)
 const activeCard = computed(() => cards.find((c) => c.active))
+const quotaText = computed(() => {
+  const q = chatStore.freeQuota
+  if (!q || q.limit == null) return ''
+  return q.remaining > 0 ? `今日免费剩余 ${q.remaining}/${q.limit} 次` : '今日免费额度已用完，明天自动恢复'
+})
 
 for (const value of PROVIDER_ORDER) {
   const meta = PROVIDER_META[value]
@@ -167,7 +177,10 @@ function refresh() {
   }
 }
 
-onMounted(refresh)
+onMounted(() => {
+  refresh()
+  chatStore.loadFreeQuota()
+})
 </script>
 
 <style scoped>

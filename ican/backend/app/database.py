@@ -74,6 +74,12 @@ CREATE TABLE IF NOT EXISTS app_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL             -- 简单 KV：目前存 secret_key（云库模式下密钥跨重启持久）
 );
+CREATE TABLE IF NOT EXISTS usage_daily (
+    quota_key TEXT NOT NULL,        -- 'u:<uid>' 登录用户独立额度；'guest' 游客共享池
+    day TEXT NOT NULL,              -- 归零日期 YYYY-MM-DD（按 quota_utc_offset）
+    used INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (quota_key, day)
+);
 """
 
 

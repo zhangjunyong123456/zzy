@@ -77,6 +77,14 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <span
+          v-if="store.freeQuota && store.freeQuota.limit != null"
+          class="quota-badge"
+          :class="{ empty: store.freeQuota.remaining <= 0 }"
+          title="未配置自己的 Key 时，每日可用免费真 AI 次数（游客共享池）"
+        >
+          今日免费 {{ store.freeQuota.remaining }}/{{ store.freeQuota.limit }}
+        </span>
         <el-button
           v-if="store.streaming"
           type="danger"
@@ -143,7 +151,10 @@ async function delMemory(m) {
   }
 }
 
-onMounted(() => store.loadMemories())
+onMounted(() => {
+  store.loadMemories()
+  store.loadFreeQuota()
+})
 
 async function onFiles(e) {
   const files = [...(e.target.files || [])]
@@ -334,6 +345,22 @@ function doSend() {
   text-overflow: ellipsis;
 }
 .mp-arrow { font-size: 10px; transform: translateY(-1px); }
+
+.quota-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff3ec;
+  color: var(--accent, #d9694a);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: default;
+}
+.quota-badge.empty {
+  background: #f4f4f5;
+  color: var(--text-sub, #878e99);
+}
 
 .mi-check {
   display: inline-block;

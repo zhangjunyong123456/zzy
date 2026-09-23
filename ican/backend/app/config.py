@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     # 全局 .env 的 Key 不再用于用户对话，未带 Key 一律走演示模式
     byok_only: bool = False
 
+    # 每日免费额度（次/天）：未自带 Key 的用户每日可用服务器 Key 跑真 AI 的次数，
+    # 游客（未登录）共享同一个池；0 = 不限（旧行为）。用尽自动降级演示模式。
+    # 与 byok_only 互斥生效：byok_only=1 时额度不参与（无 Key 一律演示模式）
+    daily_free_quota: int = 0
+    quota_utc_offset: int = 8                # 额度按 UTC+8 每日归零
+
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
